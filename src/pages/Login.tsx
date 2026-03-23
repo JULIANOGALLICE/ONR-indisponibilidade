@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock, Mail } from 'lucide-react';
@@ -84,6 +84,13 @@ export function Login() {
             Entrar
           </button>
         </form>
+
+        <div className="mt-6 text-center text-sm text-slate-600">
+          Ainda não tem uma conta?{' '}
+          <Link to="/register" className="text-indigo-600 font-semibold hover:text-indigo-800">
+            Cadastre-se agora
+          </Link>
+        </div>
       </div>
     </div>
   );

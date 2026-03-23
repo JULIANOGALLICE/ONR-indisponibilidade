@@ -1,12 +1,74 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle, Copy } from 'lucide-react';
+import { generateCustomText } from '../utils/template';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Dashboard() {
   const [documentos, setDocumentos] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [errors, setErrors] = useState<any[]>([]);
+  const [templates, setTemplates] = useState({ template_positive: '', template_negative: '' });
+  const [expirationDate, setExpirationDate] = useState<string | null>(null);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await axios.get('/api/config/templates');
+      if (res.data) {
+        setTemplates({
+          template_positive: res.data.template_positive || '',
+          template_negative: res.data.template_negative || ''
+        });
+        setExpirationDate(res.data.expiration_date);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar modelos de texto', err);
+    }
+  };
+
+  const generateTextForResult = (res: any) => {
+    const d = res.data?.data;
+    if (!d) return '';
+    
+    const isIndisponivel = d.indisponivel;
+    const template = isIndisponivel ? templates.template_positive : templates.template_negative;
+    
+    const u = d.dados_usuario || {};
+    return generateCustomText(template, {
+      Documento: d.documento || res.documento,
+      Nome: d.nomeRazao || u.nome || '',
+      Hash: u.hash || '',
+      DataHora: u.data || '',
+      QtdOrdens: d.qtdOrdens || 0,
+      Protocolos: d.protocolos ? d.protocolos.join(', ') : ''
+    });
+  };
+
+  const handleCopyText = (res: any) => {
+    const text = generateTextForResult(res);
+    if (text) {
+      navigator.clipboard.writeText(text);
+      alert('Texto copiado para a área de transferência!');
+    } else {
+      alert('Modelo de texto não configurado ou dados incompletos.');
+    }
+  };
+
+  const handleCopyAllText = () => {
+    const texts = results.map(res => generateTextForResult(res)).filter(t => t);
+    if (texts.length > 0) {
+      navigator.clipboard.writeText(texts.join('\n\n'));
+      alert('Textos copiados para a área de transferência!');
+    } else {
+      alert('Nenhum texto gerado.');
+    }
+  };
 
   const handleConsultar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,11 +117,22 @@ export function Dashboard() {
     setLoading(false);
   };
 
+  const isExpired = user?.role !== 'superadmin' && expirationDate && new Date(expirationDate) < new Date();
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-900">Consultas ONR</h1>
       </div>
+
+      {isExpired && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+          <div className="flex items-center gap-2 text-red-800 font-medium">
+            <AlertCircle className="w-5 h-5" />
+            Sua licença expirou. Por favor, renove sua assinatura para continuar utilizando o sistema.
+          </div>
+        </div>
+      )}
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -75,13 +148,14 @@ export function Dashboard() {
               value={documentos}
               onChange={(e) => setDocumentos(e.target.value)}
               rows={5}
+              disabled={loading || isExpired}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Exemplo:&#10;12345678900&#10;98765432100"
             />
           </div>
           <button
             type="submit"
-            disabled={loading || !documentos.trim()}
+            disabled={loading || !documentos.trim() || isExpired}
             className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Consultando...' : 'Consultar'}
@@ -123,15 +197,25 @@ export function Dashboard() {
                         <CheckCircle className="w-5 h-5 text-emerald-500" />
                         <h3 className="font-semibold text-slate-800">Documento: {res.documento}</h3>
                       </div>
-                      {isIndisponivel ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Indisponível
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Disponível
-                        </span>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleCopyText(res)}
+                          className="flex items-center gap-1 px-3 py-1 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          title="Gerar e copiar texto personalizado"
+                        >
+                          <Copy className="w-4 h-4" />
+                          Gerar Texto
+                        </button>
+                        {isIndisponivel ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            Indisponível
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Disponível
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="p-4">
                       {d ? (
@@ -148,11 +232,16 @@ export function Dashboard() {
                             <div className="col-span-1 md:col-span-2">
                               <p className="text-slate-500 mb-1">Protocolos</p>
                               <div className="flex flex-wrap gap-2">
-                                {d.protocolos.map((p: string, i: number) => (
+                                {d.protocolos.slice(0, 5).map((p: string, i: number) => (
                                   <span key={i} className="inline-block bg-slate-100 px-2 py-1 rounded text-xs text-slate-700">
                                     {p}
                                   </span>
                                 ))}
+                                {d.protocolos.length > 5 && (
+                                  <span className="inline-block bg-slate-200 px-2 py-1 rounded text-xs text-slate-600 font-medium" title={`${d.protocolos.length - 5} mais protocolos ocultos`}>
+                                    +{d.protocolos.length - 5} mais
+                                  </span>
+                                )}
                               </div>
                             </div>
                           )}
@@ -166,6 +255,18 @@ export function Dashboard() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {results.length > 1 && (
+            <div className="pt-4 flex justify-end">
+              <button
+                onClick={handleCopyAllText}
+                className="flex items-center gap-2 bg-slate-800 text-white py-2 px-6 rounded-lg font-medium hover:bg-slate-900 transition-colors"
+              >
+                <Copy className="w-4 h-4" />
+                Gerar Texto de Todos
+              </button>
             </div>
           )}
         </div>

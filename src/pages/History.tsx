@@ -1,11 +1,27 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Calendar, FileText, User, Building } from 'lucide-react';
+import { Search, Calendar, FileText, User, Building, Copy } from 'lucide-react';
+import { generateCustomText } from '../utils/template';
 
 export function History() {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [templates, setTemplates] = useState({ template_positive: '', template_negative: '' });
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await axios.get('/api/config/templates');
+      if (res.data) {
+        setTemplates({
+          template_positive: res.data.template_positive || '',
+          template_negative: res.data.template_negative || ''
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao carregar modelos de texto', err);
+    }
+  };
 
   const fetchHistory = async (searchQuery = '') => {
     setLoading(true);
@@ -20,8 +36,30 @@ export function History() {
   };
 
   useEffect(() => {
+    fetchTemplates();
     fetchHistory();
   }, []);
+
+  const handleCopyText = (item: any, protocolos: string[]) => {
+    const isIndisponivel = item.indisponivel;
+    const template = isIndisponivel ? templates.template_positive : templates.template_negative;
+    
+    const text = generateCustomText(template, {
+      Documento: item.documento || '',
+      Nome: item.nome_razao || item.nome || '',
+      Hash: item.hash || '',
+      DataHora: item.data || new Date(item.created_at).toLocaleString('pt-BR'),
+      QtdOrdens: item.qtd_ordens || 0,
+      Protocolos: protocolos.length > 0 ? protocolos.join(', ') : ''
+    });
+
+    if (text) {
+      navigator.clipboard.writeText(text);
+      alert('Texto copiado para a área de transferência!');
+    } else {
+      alert('Modelo de texto não configurado ou dados incompletos.');
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +111,7 @@ export function History() {
                   <th className="p-4 text-sm font-semibold text-gray-600">Status</th>
                   <th className="p-4 text-sm font-semibold text-gray-600">Hash</th>
                   <th className="p-4 text-sm font-semibold text-gray-600">Protocolos</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -122,15 +161,29 @@ export function History() {
                     <td className="p-4 text-sm text-gray-600">
                       {item.indisponivel && protocolos.length > 0 ? (
                         <div className="flex flex-col gap-1">
-                          {protocolos.map((p, i) => (
+                          {protocolos.slice(0, 3).map((p, i) => (
                             <span key={i} className="inline-block bg-gray-100 px-2 py-1 rounded text-xs">
                               {p}
                             </span>
                           ))}
+                          {protocolos.length > 3 && (
+                            <span className="inline-block bg-gray-200 px-2 py-1 rounded text-xs text-gray-500 font-medium text-center" title={`${protocolos.length - 3} mais protocolos ocultos`}>
+                              +{protocolos.length - 3}
+                            </span>
+                          )}
                         </div>
                       ) : (
                         '-'
                       )}
+                    </td>
+                    <td className="p-4 text-sm text-gray-600">
+                      <button
+                        onClick={() => handleCopyText(item, protocolos)}
+                        className="flex items-center justify-center p-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                        title="Gerar e copiar texto personalizado"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 )})}

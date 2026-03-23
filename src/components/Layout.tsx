@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, Users, Settings, Search, KeyRound, History } from 'lucide-react';
+import { LogOut, Users, Settings, Search, KeyRound, History, Building, CreditCard, ShieldAlert } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function Layout() {
@@ -18,6 +18,9 @@ export function Layout() {
     { path: '/history', label: 'Histórico', icon: History, roles: ['superadmin', 'admin', 'user'] },
     { path: '/config', label: 'Configurações ONR', icon: Settings, roles: ['superadmin', 'admin'] },
     { path: '/users', label: 'Usuários', icon: Users, roles: ['superadmin', 'admin'] },
+    { path: '/groups', label: 'Agrupamentos', icon: Building, roles: ['superadmin'] },
+    { path: '/system-settings', label: 'Config. Sistema', icon: ShieldAlert, roles: ['superadmin'] },
+    { path: '/billing', label: 'Assinatura', icon: CreditCard, roles: ['superadmin', 'admin'] },
     { path: '/change-password', label: 'Alterar Senha', icon: KeyRound, roles: ['superadmin', 'admin', 'user'] },
   ];
 

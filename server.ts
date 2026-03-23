@@ -2,9 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { initDb } from './server/database.js';
+import { initDb } from './server/database.ts';
 import path from 'path';
 import axios from 'axios';
+import nodemailer from 'nodemailer';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
 
@@ -16,6 +17,35 @@ async function startServer() {
   app.use(express.json());
 
   const db = await initDb();
+
+  // Email Transporter
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_PORT === '465',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  const sendEmail = async (to: string, subject: string, html: string) => {
+    if (!process.env.SMTP_HOST) {
+      console.log(`[MOCK EMAIL] Para: ${to}\nAssunto: ${subject}\nConteúdo: ${html}`);
+      return;
+    }
+    try {
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || '"Sistema ONR" <noreply@onr.com>',
+        to,
+        subject,
+        html,
+      });
+    } catch (err) {
+      console.error('Erro ao enviar e-mail:', err);
+      throw err;
+    }
+  };
 
   // Middleware to authenticate token
   const authenticateToken = (req: any, res: any, next: any) => {
@@ -42,11 +72,137 @@ async function startServer() {
   };
 
   // Auth Routes
+  app.post('/api/auth/register', async (req, res) => {
+    const { email, password, name, cpf } = req.body;
+    try {
+      const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+      if (existingUser) return res.status(400).json({ error: 'E-mail já cadastrado.' });
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const confirmationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
+
+      // Create a new group for this client
+      const groupResult = await db.run('INSERT INTO groups (name) VALUES (?)', [`Grupo de ${name}`]);
+      const groupId = groupResult.lastID;
+
+      await db.run(
+        'INSERT INTO users (email, password, name, cpf, role, group_id, confirmation_token, is_confirmed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [email, hashedPassword, name, cpf, 'admin', groupId, confirmationToken, 0]
+      );
+
+      // Send confirmation email
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
+      
+      await sendEmail(
+        email,
+        'Confirme seu cadastro - Sistema ONR',
+        `
+        <h1>Olá, ${name}!</h1>
+        <p>Obrigado por se cadastrar no Sistema ONR.</p>
+        <p>Para ativar sua conta, clique no link abaixo:</p>
+        <a href="${confirmationLink}">${confirmationLink}</a>
+        <p>O link expira em 24 horas.</p>
+        `
+      );
+
+      res.json({ message: 'Cadastro realizado com sucesso. Verifique seu e-mail para confirmar.' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  app.get('/api/auth/confirm/:token', async (req, res) => {
+    const { token } = req.params;
+    try {
+      const decoded: any = jwt.verify(token, JWT_SECRET);
+      const user = await db.get('SELECT * FROM users WHERE email = ? AND confirmation_token = ?', [decoded.email, token]);
+      
+      if (!user) return res.status(400).json({ error: 'Token inválido ou expirado.' });
+      if (user.is_confirmed) return res.json({ message: 'E-mail já confirmado.' });
+
+      const settings = await db.get('SELECT trial_days FROM system_settings LIMIT 1');
+      const trialDays = settings?.trial_days || 0;
+      
+      let expirationDate = null;
+      if (trialDays > 0) {
+        const date = new Date();
+        date.setDate(date.getDate() + trialDays);
+        expirationDate = date.toISOString();
+      }
+
+      await db.run('UPDATE users SET is_confirmed = 1, confirmation_token = NULL WHERE id = ?', [user.id]);
+      if (expirationDate) {
+        await db.run('UPDATE groups SET expiration_date = ? WHERE id = ?', [expirationDate, user.group_id]);
+      }
+
+      res.json({ message: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
+    } catch (err) {
+      res.status(400).json({ error: 'Token inválido ou expirado.' });
+    }
+  });
+
+  app.post('/api/auth/recover-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+      const user = await db.get('SELECT id, name FROM users WHERE email = ?', [email]);
+      if (!user) {
+        // Por segurança, não informamos se o e-mail existe ou não
+        return res.json({ message: 'Se o e-mail estiver cadastrado, você receberá as instruções em instantes.' });
+      }
+
+      const resetToken = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: '1h' });
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
+
+      await sendEmail(
+        email,
+        'Recuperação de Senha - Sistema ONR',
+        `
+        <h1>Olá, ${user.name || 'Usuário'}!</h1>
+        <p>Recebemos uma solicitação para redefinir sua senha.</p>
+        <p>Para criar uma nova senha, clique no link abaixo:</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>Este link é válido por 1 hora.</p>
+        <p>Se você não solicitou a alteração, ignore este e-mail.</p>
+        `
+      );
+
+      res.json({ message: 'Se o e-mail estiver cadastrado, você receberá as instruções em instantes.' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    try {
+      const decoded: any = jwt.verify(token, JWT_SECRET);
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      
+      const result = await db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, decoded.id]);
+      
+      if (result.changes === 0) {
+        return res.status(400).json({ error: 'Usuário não encontrado ou token inválido.' });
+      }
+
+      res.json({ message: 'Senha redefinida com sucesso!' });
+    } catch (err) {
+      res.status(400).json({ error: 'Token inválido ou expirado.' });
+    }
+  });
+
   app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     try {
       const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
       if (!user) return res.status(400).json({ error: 'Usuário não encontrado.' });
+
+      if (user.role !== 'superadmin' && !user.is_confirmed) {
+        return res.status(400).json({ error: 'Por favor, confirme seu e-mail antes de fazer login.' });
+      }
 
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) return res.status(400).json({ error: 'Senha incorreta.' });
@@ -98,7 +254,7 @@ async function startServer() {
       const targetGroupId = req.user.role === 'superadmin' ? (group_id || 1) : req.user.group_id;
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      await db.run('INSERT INTO users (email, password, role, group_id) VALUES (?, ?, ?, ?)', [email, hashedPassword, role, targetGroupId]);
+      await db.run('INSERT INTO users (email, password, role, group_id, is_confirmed) VALUES (?, ?, ?, ?, ?)', [email, hashedPassword, role, targetGroupId, 1]);
       res.json({ message: 'Usuário criado com sucesso.' });
     } catch (err: any) {
       if (err.message.includes('UNIQUE constraint failed')) {
@@ -132,7 +288,16 @@ async function startServer() {
   // Config Routes (Admin/SuperAdmin)
   app.get('/api/config', authenticateToken, authorizeRole(['superadmin', 'admin']), async (req: any, res) => {
     try {
-      const config = await db.get('SELECT client_id, client_secret, environment, cpf_usuario FROM groups WHERE id = ?', [req.user.group_id]);
+      const config = await db.get('SELECT client_id, client_secret, environment, cpf_usuario, template_positive, template_negative FROM groups WHERE id = ?', [req.user.group_id]);
+      res.json(config || {});
+    } catch (err) {
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  app.get('/api/config/templates', authenticateToken, async (req: any, res) => {
+    try {
+      const config = await db.get('SELECT template_positive, template_negative, expiration_date FROM groups WHERE id = ?', [req.user.group_id]);
       res.json(config || {});
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
@@ -140,11 +305,11 @@ async function startServer() {
   });
 
   app.post('/api/config', authenticateToken, authorizeRole(['superadmin', 'admin']), async (req: any, res) => {
-    const { client_id, client_secret, environment, cpf_usuario } = req.body;
+    const { client_id, client_secret, environment, cpf_usuario, template_positive, template_negative } = req.body;
     try {
       await db.run(
-        'UPDATE groups SET client_id = ?, client_secret = ?, environment = ?, cpf_usuario = ? WHERE id = ?',
-        [client_id, client_secret, environment, cpf_usuario, req.user.group_id]
+        'UPDATE groups SET client_id = ?, client_secret = ?, environment = ?, cpf_usuario = ?, template_positive = ?, template_negative = ? WHERE id = ?',
+        [client_id, client_secret, environment, cpf_usuario, template_positive, template_negative, req.user.group_id]
       );
       res.json({ message: 'Configurações atualizadas com sucesso.' });
     } catch (err) {
@@ -155,7 +320,11 @@ async function startServer() {
   // Groups Routes (SuperAdmin)
   app.get('/api/groups', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
     try {
-      const groups = await db.all('SELECT id, name, environment, created_at FROM groups');
+      const groups = await db.all(`
+        SELECT g.id, g.name, g.environment, g.created_at, g.expiration_date,
+        (SELECT email FROM users WHERE group_id = g.id AND role = 'admin' LIMIT 1) as admin_email
+        FROM groups g
+      `);
       res.json(groups);
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
@@ -172,29 +341,201 @@ async function startServer() {
     }
   });
 
+  app.put('/api/groups/:id/expiration', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
+    const { expiration_date } = req.body;
+    try {
+      await db.run('UPDATE groups SET expiration_date = ? WHERE id = ?', [expiration_date, req.params.id]);
+      res.json({ message: 'Data de expiração atualizada com sucesso.' });
+    } catch (err) {
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  // System Settings Routes (SuperAdmin)
+  app.get('/api/system-settings', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
+    try {
+      const settings = await db.get('SELECT * FROM system_settings LIMIT 1');
+      res.json(settings || {});
+    } catch (err) {
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  app.post('/api/system-settings', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
+    const { mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days } = req.body;
+    try {
+      await db.run(
+        'UPDATE system_settings SET mp_access_token = ?, mp_public_key = ?, price_30 = ?, price_90 = ?, price_180 = ?, price_365 = ?, trial_days = ? WHERE id = 1',
+        [mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days]
+      );
+      res.json({ message: 'Configurações do sistema atualizadas.' });
+    } catch (err) {
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  // Billing Routes
+  app.get('/api/billing/plans', authenticateToken, async (req: any, res) => {
+    try {
+      const settings = await db.get('SELECT mp_public_key, price_30, price_90, price_180, price_365 FROM system_settings LIMIT 1');
+      const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [req.user.group_id]);
+      res.json({
+        plans: {
+          30: settings?.price_30 || 0,
+          90: settings?.price_90 || 0,
+          180: settings?.price_180 || 0,
+          365: settings?.price_365 || 0
+        },
+        mp_public_key: settings?.mp_public_key,
+        expiration_date: group?.expiration_date
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  app.post('/api/billing/create-preference', authenticateToken, async (req: any, res) => {
+    const { days } = req.body;
+    if (![30, 90, 180, 365].includes(days)) {
+      return res.status(400).json({ error: 'Plano inválido.' });
+    }
+
+    try {
+      const settings = await db.get('SELECT * FROM system_settings LIMIT 1');
+      if (!settings || !settings.mp_access_token) {
+        return res.status(400).json({ error: 'Mercado Pago não configurado.' });
+      }
+
+      const price = settings[`price_${days}`];
+      if (!price || price <= 0) {
+        return res.status(400).json({ error: 'Preço não configurado para este plano.' });
+      }
+
+      const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
+      
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      
+      const preferenceData = {
+        items: [
+          {
+            title: `Licença de ${days} dias - Sistema ONR`,
+            quantity: 1,
+            unit_price: Number(price),
+            currency_id: 'BRL'
+          }
+        ],
+        back_urls: {
+          success: `${appUrl}/billing?status=success`,
+          failure: `${appUrl}/billing?status=failure`,
+          pending: `${appUrl}/billing?status=pending`
+        },
+        auto_return: 'approved',
+        external_reference: external_reference,
+        notification_url: `${appUrl}/api/webhooks/mercadopago`
+      };
+
+      const mpRes = await axios.post('https://api.mercadopago.com/checkout/preferences', preferenceData, {
+        headers: {
+          'Authorization': `Bearer ${settings.mp_access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      await db.run(
+        'INSERT INTO payments (group_id, mp_preference_id, external_reference, status, days, amount) VALUES (?, ?, ?, ?, ?, ?)',
+        [req.user.group_id, mpRes.data.id, external_reference, 'pending', days, price]
+      );
+
+      res.json({ init_point: mpRes.data.init_point, preference_id: mpRes.data.id });
+    } catch (err: any) {
+      console.error('Erro ao criar preferência MP:', err.response?.data || err.message);
+      res.status(500).json({ error: 'Erro ao gerar pagamento.' });
+    }
+  });
+
+  // Webhook Mercado Pago
+  app.post('/api/webhooks/mercadopago', async (req, res) => {
+    const { action, data, type } = req.body;
+    
+    // Always return 200 OK to Mercado Pago immediately
+    res.status(200).send('OK');
+
+    if (type === 'payment' || action === 'payment.created' || action === 'payment.updated') {
+      try {
+        const paymentId = data?.id;
+        if (!paymentId) return;
+
+        const settings = await db.get('SELECT mp_access_token FROM system_settings LIMIT 1');
+        if (!settings || !settings.mp_access_token) return;
+
+        const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+          headers: { 'Authorization': `Bearer ${settings.mp_access_token}` }
+        });
+
+        const paymentData = mpRes.data;
+        const external_reference = paymentData.external_reference;
+        const status = paymentData.status;
+
+        if (!external_reference) return;
+
+        const [groupIdStr, daysStr] = external_reference.split('_');
+        const groupId = parseInt(groupIdStr);
+        const days = parseInt(daysStr);
+
+        // Update payment record
+        const updateRes = await db.run(
+          'UPDATE payments SET status = ?, mp_payment_id = ?, updated_at = CURRENT_TIMESTAMP WHERE external_reference = ? AND status = "pending"',
+          [status, paymentId, external_reference]
+        );
+
+        if (status === 'approved' && updateRes.changes && updateRes.changes > 0) {
+          // Add days to group's expiration_date
+          const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [groupId]);
+          let newExpiration = new Date();
+          
+          if (group && group.expiration_date) {
+            const currentExpiration = new Date(group.expiration_date);
+            if (currentExpiration > newExpiration) {
+              newExpiration = currentExpiration;
+            }
+          }
+          
+          newExpiration.setDate(newExpiration.getDate() + days);
+          
+          await db.run(
+            'UPDATE groups SET expiration_date = ? WHERE id = ?',
+            [newExpiration.toISOString(), groupId]
+          );
+        }
+      } catch (err) {
+        console.error('Webhook processing error:', err);
+      }
+    }
+  });
+
   // History Routes
   app.get('/api/history', authenticateToken, async (req: any, res) => {
     try {
       const search = req.query.search ? `%${req.query.search}%` : null;
-      let query = 'SELECT * FROM history WHERE ';
+      let query = 'SELECT history.* FROM history JOIN users ON history.user_id = users.id WHERE ';
       const params: any[] = [];
 
       if (req.user.role === 'admin') {
-        query += 'group_id = ?';
+        query += 'history.group_id = ? AND users.role != "superadmin"';
         params.push(req.user.group_id);
       } else if (req.user.role === 'superadmin') {
         query += '1=1'; // Superadmin sees all
       } else {
-        query += 'user_id = ?';
+        query += 'history.user_id = ?';
         params.push(req.user.id);
       }
 
       if (search) {
-        query += ' AND (documento LIKE ? OR nome_razao LIKE ? OR nome LIKE ? OR documento_usuario LIKE ?)';
+        query += ' AND (history.documento LIKE ? OR history.nome_razao LIKE ? OR history.nome LIKE ? OR history.documento_usuario LIKE ?)';
         params.push(search, search, search, search);
       }
 
-      query += ' ORDER BY created_at DESC LIMIT 100';
+      query += ' ORDER BY history.created_at DESC LIMIT 100';
       
       const history = await db.all(query, params);
       res.json(history);
@@ -210,7 +551,9 @@ async function startServer() {
       throw new Error('Configurações do ONR não definidas para este grupo.');
     }
 
-    const authUrl = 'https://auth.id.onr.org.br/connect/token';
+    const authUrl = config.environment === 'prod' 
+      ? 'https://auth.id.onr.org.br/connect/token' 
+      : 'https://stg-auth.id.onr.org.br/connect/token';
 
     try {
       const response = await axios.post(authUrl, new URLSearchParams({
@@ -235,6 +578,15 @@ async function startServer() {
 
   app.post('/api/onr/consultar', authenticateToken, async (req: any, res) => {
     try {
+      // Check expiration
+      const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [req.user.group_id]);
+      if (req.user.role !== 'superadmin' && group && group.expiration_date) {
+        const expDate = new Date(group.expiration_date);
+        if (expDate < new Date()) {
+          return res.status(403).json({ error: 'Sua licença expirou. Por favor, renove sua assinatura para continuar utilizando o sistema.' });
+        }
+      }
+
       const { token, config } = await getOnrToken(req.user.group_id);
       const baseUrl = getBaseUrl(config.environment);
       

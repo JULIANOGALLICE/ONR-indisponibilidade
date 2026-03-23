@@ -13,7 +13,11 @@ export async function initDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
+      name TEXT,
+      cpf TEXT,
       role TEXT NOT NULL CHECK(role IN ('superadmin', 'admin', 'user')),
+      is_confirmed BOOLEAN DEFAULT 0,
+      confirmation_token TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -52,13 +56,69 @@ export async function initDb() {
       filtros TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS system_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mp_access_token TEXT,
+      mp_public_key TEXT,
+      price_30 REAL DEFAULT 0,
+      price_90 REAL DEFAULT 0,
+      price_180 REAL DEFAULT 0,
+      price_365 REAL DEFAULT 0,
+      trial_days INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER,
+      mp_payment_id TEXT,
+      mp_preference_id TEXT,
+      external_reference TEXT,
+      status TEXT,
+      days INTEGER,
+      amount REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
+
+  try {
+    await db.exec('ALTER TABLE users ADD COLUMN name TEXT');
+  } catch (e) {}
+
+  try {
+    await db.exec('ALTER TABLE users ADD COLUMN cpf TEXT');
+  } catch (e) {}
+
+  try {
+    await db.exec('ALTER TABLE users ADD COLUMN is_confirmed BOOLEAN DEFAULT 0');
+  } catch (e) {}
+
+  try {
+    await db.exec('ALTER TABLE users ADD COLUMN confirmation_token TEXT');
+  } catch (e) {}
+
+  try {
+    await db.exec('ALTER TABLE system_settings ADD COLUMN trial_days INTEGER DEFAULT 0');
+  } catch (e) {}
 
   try {
     await db.exec('ALTER TABLE users ADD COLUMN group_id INTEGER REFERENCES groups(id)');
   } catch (e) {
     // Column might already exist
   }
+
+  try {
+    await db.exec('ALTER TABLE groups ADD COLUMN template_positive TEXT');
+  } catch (e) {}
+
+  try {
+    await db.exec('ALTER TABLE groups ADD COLUMN template_negative TEXT');
+  } catch (e) {}
+
+  try {
+    await db.exec('ALTER TABLE groups ADD COLUMN expiration_date DATETIME');
+  } catch (e) {}
 
   // Create default group if none exists
   const defaultGroup = await db.get('SELECT * FROM groups WHERE id = 1');
@@ -87,6 +147,12 @@ export async function initDb() {
       'INSERT INTO users (email, password, role, group_id) VALUES (?, ?, ?, ?)',
       ['superadmin@admin.com', hashedPassword, 'superadmin', 1]
     );
+  }
+
+  // Insert default system settings if not exists
+  const settings = await db.get('SELECT * FROM system_settings LIMIT 1');
+  if (!settings) {
+    await db.run('INSERT INTO system_settings (price_30, price_90, price_180, price_365) VALUES (0, 0, 0, 0)');
   }
 
   return db;

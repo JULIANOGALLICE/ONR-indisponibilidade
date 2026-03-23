@@ -7,7 +7,9 @@ export function Config() {
     client_id: '',
     client_secret: '',
     environment: 'stg',
-    cpf_usuario: ''
+    cpf_usuario: '',
+    template_positive: '',
+    template_negative: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -122,6 +124,41 @@ export function Config() {
                 placeholder="Apenas números"
               />
               <p className="text-xs text-slate-500 mt-1">Enviado no payload das requisições.</p>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-6 mt-6">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">Modelos de Texto Personalizado</h2>
+            <p className="text-sm text-slate-500 mb-6">
+              Use as variáveis: {'{Documento}'}, {'{Nome}'}, {'{Hash}'}, {'{DataHora}'}, {'{QtdOrdens}'}, {'{Protocolos}'}
+            </p>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Modelo para Indisponibilidade Positiva (Encontrado)
+                </label>
+                <textarea
+                  rows={5}
+                  value={config.template_positive || ''}
+                  onChange={(e) => setConfig({ ...config, template_positive: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                  placeholder="Ex: Certifico que a pesquisa por {Documento} de {Nome} retornou INDISPONIBILIDADE POSITIVA..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Modelo para Indisponibilidade Negativa (Não Encontrado)
+                </label>
+                <textarea
+                  rows={5}
+                  value={config.template_negative || ''}
+                  onChange={(e) => setConfig({ ...config, template_negative: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                  placeholder="Ex: Certifico que a pesquisa por {Documento} de {Nome} retornou INDISPONIBILIDADE NEGATIVA..."
+                />
+              </div>
             </div>
           </div>
 

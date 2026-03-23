@@ -1,0 +1,5 @@
+{
+  "name": "Sistema ONR",
+  "description": "Sistema para consumir a API do ONR (CNIB 2.0) com gerenciamento de usuários e configurações.",
+  "requestFramePermissions": []
+}

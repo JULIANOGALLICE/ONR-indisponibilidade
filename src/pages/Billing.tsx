@@ -57,9 +57,30 @@ export function Billing() {
     setError('');
     setPaymentSuccess(false);
     try {
-      const res = await axios.post('/api/billing/create-pix', { days });
+      const res = await axios.post('/api/billing/create-pix', { 
+        days,
+        appUrl: window.location.origin
+      });
       if (res.data.qr_code) {
         setPixData(res.data);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao iniciar pagamento.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleCheckout = async (days: number) => {
+    setProcessing(true);
+    setError('');
+    try {
+      const res = await axios.post('/api/billing/create-preference', { 
+        days,
+        appUrl: window.location.origin
+      });
+      if (res.data.init_point) {
+        window.location.href = res.data.init_point;
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao iniciar pagamento.');
@@ -159,7 +180,7 @@ export function Billing() {
                   R$ {price.toFixed(2).replace('.', ',')}
                 </div>
               </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-100">
+              <div className="p-6 bg-slate-50 border-t border-slate-100 space-y-3">
                 <button
                   onClick={() => handleBuy(plan.days)}
                   disabled={processing}
@@ -167,6 +188,14 @@ export function Billing() {
                 >
                   <CreditCard className="w-4 h-4" />
                   {processing ? 'Processando...' : 'Pagar com PIX'}
+                </button>
+                <button
+                  onClick={() => handleCheckout(plan.days)}
+                  disabled={processing}
+                  className="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 py-2 px-4 rounded-lg font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  Cartão / Outros
                 </button>
               </div>
             </div>

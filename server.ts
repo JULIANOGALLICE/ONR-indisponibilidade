@@ -132,10 +132,17 @@ async function startServer() {
     const { token } = req.params;
     try {
       const decoded: any = jwt.verify(token, JWT_SECRET);
-      const user = await db.get('SELECT * FROM users WHERE email = ? AND confirmation_token = ?', [decoded.email, token]);
+      const user = await db.get('SELECT * FROM users WHERE email = ?', [decoded.email]);
       
-      if (!user) return res.status(400).json({ error: 'Token inválido ou expirado.' });
-      if (user.is_confirmed) return res.json({ message: 'E-mail já confirmado.' });
+      if (!user) return res.status(400).json({ error: 'Usuário não encontrado.' });
+      
+      if (user.is_confirmed) {
+        return res.json({ message: 'E-mail já confirmado! Você já pode fazer login.' });
+      }
+
+      if (user.confirmation_token !== token) {
+        return res.status(400).json({ error: 'Token inválido ou expirado.' });
+      }
 
       await db.run('UPDATE users SET is_confirmed = 1, confirmation_token = NULL WHERE id = ?', [user.id]);
 
@@ -435,7 +442,7 @@ async function startServer() {
   });
 
   app.post('/api/billing/create-pix', authenticateToken, async (req: any, res) => {
-    const { days } = req.body;
+    const { days, appUrl: clientUrl } = req.body;
     if (![30, 90, 180, 365].includes(days)) {
       return res.status(400).json({ error: 'Plano inválido.' });
     }
@@ -453,6 +460,8 @@ async function startServer() {
 
       const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
       
+      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
+      
       const paymentData = {
         transaction_amount: Number(price),
         description: `Licença de ${days} dias - Sistema ONR`,
@@ -460,7 +469,8 @@ async function startServer() {
         payer: {
           email: req.user.email,
         },
-        external_reference: external_reference
+        external_reference: external_reference,
+        notification_url: `${appUrl}/api/webhooks/mercadopago`
       };
 
       const response = await axios.post('https://api.mercadopago.com/v1/payments', paymentData, {
@@ -491,8 +501,53 @@ async function startServer() {
 
   app.get('/api/billing/payment-status/:id', authenticateToken, async (req: any, res) => {
     try {
-      const payment = await db.get('SELECT status FROM payments WHERE mp_payment_id = ? AND group_id = ?', [req.params.id, req.user.group_id]);
+      const payment = await db.get('SELECT status, external_reference, days FROM payments WHERE mp_payment_id = ? AND group_id = ?', [req.params.id, req.user.group_id]);
       if (!payment) return res.status(404).json({ error: 'Pagamento não encontrado.' });
+      
+      // If still pending, check Mercado Pago directly as a fallback to the webhook
+      if (payment.status === 'pending') {
+        const settings = await db.get('SELECT mp_access_token FROM system_settings LIMIT 1');
+        if (settings && settings.mp_access_token) {
+          try {
+            const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${req.params.id}`, {
+              headers: { 'Authorization': `Bearer ${settings.mp_access_token}` }
+            });
+            
+            const newStatus = mpRes.data.status;
+            if (newStatus === 'approved') {
+              // Update payment record
+              const updateRes = await db.run(
+                'UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE mp_payment_id = ? AND status = "pending"',
+                [newStatus, req.params.id]
+              );
+              
+              if (updateRes.changes && updateRes.changes > 0) {
+                // Add days to group's expiration_date
+                const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [req.user.group_id]);
+                let newExpiration = new Date();
+                
+                if (group && group.expiration_date) {
+                  const currentExpiration = new Date(group.expiration_date);
+                  if (currentExpiration > newExpiration) {
+                    newExpiration = currentExpiration;
+                  }
+                }
+                
+                newExpiration.setDate(newExpiration.getDate() + payment.days);
+                
+                await db.run(
+                  'UPDATE groups SET expiration_date = ? WHERE id = ?',
+                  [newExpiration.toISOString(), req.user.group_id]
+                );
+              }
+              return res.json({ status: newStatus });
+            }
+          } catch (mpErr) {
+            console.error('Erro ao consultar MP diretamente:', mpErr);
+          }
+        }
+      }
+
       res.json({ status: payment.status });
     } catch (err) {
       res.status(500).json({ error: 'Erro ao verificar status.' });
@@ -500,7 +555,7 @@ async function startServer() {
   });
 
   app.post('/api/billing/create-preference', authenticateToken, async (req: any, res) => {
-    const { days } = req.body;
+    const { days, appUrl: clientUrl } = req.body;
     if (![30, 90, 180, 365].includes(days)) {
       return res.status(400).json({ error: 'Plano inválido.' });
     }
@@ -518,7 +573,7 @@ async function startServer() {
 
       const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
       
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
       
       const preferenceData = {
         items: [

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { CreditCard, Calendar, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { CreditCard, Calendar, CheckCircle, AlertCircle, Clock, X, Copy } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 export function Billing() {
@@ -10,6 +10,9 @@ export function Billing() {
   const [error, setError] = useState('');
   const [processing, setProcessing] = useState(false);
   
+  const [pixData, setPixData] = useState<{ id: string, qr_code: string, qr_code_base64: string } | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const status = queryParams.get('status');
@@ -17,6 +20,25 @@ export function Billing() {
   useEffect(() => {
     fetchPlans();
   }, []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (pixData && !paymentSuccess) {
+      interval = setInterval(async () => {
+        try {
+          const res = await axios.get(`/api/billing/payment-status/${pixData.id}`);
+          if (res.data.status === 'approved') {
+            setPaymentSuccess(true);
+            setPixData(null);
+            fetchPlans(); // Refresh expiration date
+          }
+        } catch (err) {
+          console.error('Erro ao verificar status do pagamento', err);
+        }
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [pixData, paymentSuccess]);
 
   const fetchPlans = async () => {
     try {
@@ -33,14 +55,23 @@ export function Billing() {
   const handleBuy = async (days: number) => {
     setProcessing(true);
     setError('');
+    setPaymentSuccess(false);
     try {
-      const res = await axios.post('/api/billing/create-preference', { days });
-      if (res.data.init_point) {
-        window.location.href = res.data.init_point;
+      const res = await axios.post('/api/billing/create-pix', { days });
+      if (res.data.qr_code) {
+        setPixData(res.data);
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao iniciar pagamento.');
+    } finally {
       setProcessing(false);
+    }
+  };
+
+  const copyPixCode = () => {
+    if (pixData?.qr_code) {
+      navigator.clipboard.writeText(pixData.qr_code);
+      alert('Código PIX copiado!');
     }
   };
 
@@ -50,16 +81,16 @@ export function Billing() {
   const hasUnlimited = !expirationDate;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-8 relative">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-900">Assinatura e Licenças</h1>
       </div>
 
-      {status === 'success' && (
+      {(status === 'success' || paymentSuccess) && (
         <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg">
           <div className="flex items-center gap-2 text-emerald-800 font-medium">
             <CheckCircle className="w-5 h-5" />
-            Pagamento aprovado! Sua licença foi atualizada.
+            Pagamento processado com sucesso! Sua licença foi atualizada.
           </div>
         </div>
       )}
@@ -135,13 +166,65 @@ export function Billing() {
                   className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                 >
                   <CreditCard className="w-4 h-4" />
-                  {processing ? 'Processando...' : 'Comprar Agora'}
+                  {processing ? 'Processando...' : 'Pagar com PIX'}
                 </button>
               </div>
             </div>
           );
         })}
       </div>
+
+      {pixData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
+            <button 
+              onClick={() => setPixData(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <div className="text-center space-y-6">
+              <h3 className="text-2xl font-bold text-gray-900">Pagamento PIX</h3>
+              <p className="text-gray-600">
+                Escaneie o QR Code abaixo com o aplicativo do seu banco para realizar o pagamento.
+              </p>
+              
+              <div className="flex justify-center p-4 bg-white border-2 border-dashed border-gray-200 rounded-xl">
+                <img 
+                  src={`data:image/png;base64,${pixData.qr_code_base64}`} 
+                  alt="QR Code PIX" 
+                  className="w-64 h-64 object-contain"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm text-gray-500 font-medium">Ou copie o código PIX Copia e Cola:</p>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={pixData.qr_code}
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 font-mono truncate"
+                  />
+                  <button 
+                    onClick={copyPixCode}
+                    className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors"
+                    title="Copiar código"
+                  >
+                    <Copy className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-center gap-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                <Clock className="w-4 h-4 animate-pulse" />
+                Aguardando confirmação do pagamento...
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

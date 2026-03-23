@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, CheckCircle, Settings, CreditCard } from 'lucide-react';
+import { Save, CheckCircle, Settings, CreditCard, Mail } from 'lucide-react';
 
 export function SystemSettings() {
   const [settings, setSettings] = useState({
@@ -10,7 +10,12 @@ export function SystemSettings() {
     price_90: 0,
     price_180: 0,
     price_365: 0,
-    trial_days: 0
+    trial_days: 0,
+    smtp_host: '',
+    smtp_port: '',
+    smtp_user: '',
+    smtp_pass: '',
+    smtp_from: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -156,6 +161,65 @@ export function SystemSettings() {
                   value={settings.price_365 || 0}
                   onChange={(e) => setSettings({ ...settings, price_365: parseFloat(e.target.value) })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Mail className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-lg font-semibold text-slate-800">Configurações de E-mail (SMTP)</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Servidor SMTP (Host)</label>
+                <input
+                  type="text"
+                  value={settings.smtp_host || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="ex: smtp.gmail.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Porta SMTP</label>
+                <input
+                  type="text"
+                  value={settings.smtp_port || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_port: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="ex: 587 ou 465"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Usuário SMTP</label>
+                <input
+                  type="text"
+                  value={settings.smtp_user || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="ex: seu-email@gmail.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Senha SMTP</label>
+                <input
+                  type="password"
+                  value={settings.smtp_pass || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_pass: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="••••••••"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">E-mail de Remetente (From)</label>
+                <input
+                  type="text"
+                  value={settings.smtp_from || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_from: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder='ex: "Sistema ONR" <noreply@onr.com>'
                 />
               </div>
             </div>

@@ -65,7 +65,12 @@ export async function initDb() {
       price_90 REAL DEFAULT 0,
       price_180 REAL DEFAULT 0,
       price_365 REAL DEFAULT 0,
-      trial_days INTEGER DEFAULT 0
+      trial_days INTEGER DEFAULT 0,
+      smtp_host TEXT,
+      smtp_port TEXT,
+      smtp_user TEXT,
+      smtp_pass TEXT,
+      smtp_from TEXT
     );
 
     CREATE TABLE IF NOT EXISTS payments (
@@ -101,6 +106,12 @@ export async function initDb() {
   try {
     await db.exec('ALTER TABLE system_settings ADD COLUMN trial_days INTEGER DEFAULT 0');
   } catch (e) {}
+
+  try { await db.exec('ALTER TABLE system_settings ADD COLUMN smtp_host TEXT'); } catch (e) {}
+  try { await db.exec('ALTER TABLE system_settings ADD COLUMN smtp_port TEXT'); } catch (e) {}
+  try { await db.exec('ALTER TABLE system_settings ADD COLUMN smtp_user TEXT'); } catch (e) {}
+  try { await db.exec('ALTER TABLE system_settings ADD COLUMN smtp_pass TEXT'); } catch (e) {}
+  try { await db.exec('ALTER TABLE system_settings ADD COLUMN smtp_from TEXT'); } catch (e) {}
 
   try {
     await db.exec('ALTER TABLE users ADD COLUMN group_id INTEGER REFERENCES groups(id)');

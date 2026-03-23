@@ -18,32 +18,34 @@ async function startServer() {
 
   const db = await initDb();
 
-  // Email Transporter
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_PORT === '465',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-
   const sendEmail = async (to: string, subject: string, html: string) => {
-    if (!process.env.SMTP_HOST) {
-      console.log(`[MOCK EMAIL] Para: ${to}\nAssunto: ${subject}\nConteúdo: ${html}`);
-      return;
+    const settings = await db.get('SELECT smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from FROM system_settings LIMIT 1');
+    
+    if (!settings || !settings.smtp_host) {
+      console.error(`[MOCK EMAIL] Para: ${to}\nAssunto: ${subject}\nConteúdo: ${html}`);
+      throw new Error('Servidor de e-mail não configurado. Por favor, configure as credenciais SMTP no painel do superusuário.');
     }
+
+    const transporter = nodemailer.createTransport({
+      host: settings.smtp_host,
+      port: parseInt(settings.smtp_port || '587'),
+      secure: settings.smtp_port === '465',
+      auth: {
+        user: settings.smtp_user,
+        pass: settings.smtp_pass,
+      },
+    });
+
     try {
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || '"Sistema ONR" <noreply@onr.com>',
+        from: settings.smtp_from || '"Sistema ONR" <noreply@onr.com>',
         to,
         subject,
         html,
       });
     } catch (err) {
       console.error('Erro ao enviar e-mail:', err);
-      throw err;
+      throw new Error('Falha ao enviar e-mail. Verifique as credenciais SMTP.');
     }
   };
 
@@ -81,8 +83,18 @@ async function startServer() {
       const hashedPassword = await bcrypt.hash(password, 10);
       const confirmationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
 
+      const settings = await db.get('SELECT trial_days FROM system_settings LIMIT 1');
+      const trialDays = settings?.trial_days || 0;
+      
+      let expirationDate = null;
+      if (trialDays > 0) {
+        const date = new Date();
+        date.setDate(date.getDate() + trialDays);
+        expirationDate = date.toISOString();
+      }
+
       // Create a new group for this client
-      const groupResult = await db.run('INSERT INTO groups (name) VALUES (?)', [`Grupo de ${name}`]);
+      const groupResult = await db.run('INSERT INTO groups (name, expiration_date) VALUES (?, ?)', [`Assinante de ${name}`, expirationDate]);
       const groupId = groupResult.lastID;
 
       await db.run(
@@ -107,8 +119,11 @@ async function startServer() {
       );
 
       res.json({ message: 'Cadastro realizado com sucesso. Verifique seu e-mail para confirmar.' });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      if (err.message && err.message.includes('Servidor de e-mail')) {
+        return res.status(500).json({ error: err.message });
+      }
       res.status(500).json({ error: 'Erro no servidor.' });
     }
   });
@@ -122,20 +137,7 @@ async function startServer() {
       if (!user) return res.status(400).json({ error: 'Token inválido ou expirado.' });
       if (user.is_confirmed) return res.json({ message: 'E-mail já confirmado.' });
 
-      const settings = await db.get('SELECT trial_days FROM system_settings LIMIT 1');
-      const trialDays = settings?.trial_days || 0;
-      
-      let expirationDate = null;
-      if (trialDays > 0) {
-        const date = new Date();
-        date.setDate(date.getDate() + trialDays);
-        expirationDate = date.toISOString();
-      }
-
       await db.run('UPDATE users SET is_confirmed = 1, confirmation_token = NULL WHERE id = ?', [user.id]);
-      if (expirationDate) {
-        await db.run('UPDATE groups SET expiration_date = ? WHERE id = ?', [expirationDate, user.group_id]);
-      }
 
       res.json({ message: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
     } catch (err) {
@@ -170,8 +172,11 @@ async function startServer() {
       );
 
       res.json({ message: 'Se o e-mail estiver cadastrado, você receberá as instruções em instantes.' });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      if (err.message && err.message.includes('Servidor de e-mail')) {
+        return res.status(500).json({ error: err.message });
+      }
       res.status(500).json({ error: 'Erro no servidor.' });
     }
   });
@@ -207,8 +212,8 @@ async function startServer() {
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) return res.status(400).json({ error: 'Senha incorreta.' });
 
-      const token = jwt.sign({ id: user.id, email: user.email, role: user.role, group_id: user.group_id }, JWT_SECRET, { expiresIn: '24h' });
-      res.json({ token, user: { id: user.id, email: user.email, role: user.role, group_id: user.group_id } });
+      const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role, group_id: user.group_id }, JWT_SECRET, { expiresIn: '24h' });
+      res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, group_id: user.group_id } });
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
     }
@@ -362,11 +367,11 @@ async function startServer() {
   });
 
   app.post('/api/system-settings', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
-    const { mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days } = req.body;
+    const { mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from } = req.body;
     try {
       await db.run(
-        'UPDATE system_settings SET mp_access_token = ?, mp_public_key = ?, price_30 = ?, price_90 = ?, price_180 = ?, price_365 = ?, trial_days = ? WHERE id = 1',
-        [mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days]
+        'UPDATE system_settings SET mp_access_token = ?, mp_public_key = ?, price_30 = ?, price_90 = ?, price_180 = ?, price_365 = ?, trial_days = ?, smtp_host = ?, smtp_port = ?, smtp_user = ?, smtp_pass = ?, smtp_from = ? WHERE id = 1',
+        [mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from]
       );
       res.json({ message: 'Configurações do sistema atualizadas.' });
     } catch (err) {
@@ -391,6 +396,71 @@ async function startServer() {
       });
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  app.post('/api/billing/create-pix', authenticateToken, async (req: any, res) => {
+    const { days } = req.body;
+    if (![30, 90, 180, 365].includes(days)) {
+      return res.status(400).json({ error: 'Plano inválido.' });
+    }
+
+    try {
+      const settings = await db.get('SELECT * FROM system_settings LIMIT 1');
+      if (!settings || !settings.mp_access_token) {
+        return res.status(400).json({ error: 'Mercado Pago não configurado.' });
+      }
+
+      const price = settings[`price_${days}`];
+      if (!price || price <= 0) {
+        return res.status(400).json({ error: 'Preço não configurado para este plano.' });
+      }
+
+      const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
+      
+      const paymentData = {
+        transaction_amount: Number(price),
+        description: `Licença de ${days} dias - Sistema ONR`,
+        payment_method_id: 'pix',
+        payer: {
+          email: req.user.email,
+        },
+        external_reference: external_reference
+      };
+
+      const response = await axios.post('https://api.mercadopago.com/v1/payments', paymentData, {
+        headers: {
+          'Authorization': `Bearer ${settings.mp_access_token}`,
+          'X-Idempotency-Key': external_reference
+        }
+      });
+
+      const payment = response.data;
+      
+      await db.run(
+        'INSERT INTO payments (group_id, mp_payment_id, external_reference, status, days, amount) VALUES (?, ?, ?, ?, ?, ?)',
+        [req.user.group_id, payment.id, external_reference, payment.status, days, price]
+      );
+
+      res.json({
+        id: payment.id,
+        qr_code: payment.point_of_interaction.transaction_data.qr_code,
+        qr_code_base64: payment.point_of_interaction.transaction_data.qr_code_base64,
+        external_reference
+      });
+    } catch (err: any) {
+      console.error('Erro ao criar PIX:', err.response?.data || err.message);
+      res.status(500).json({ error: 'Erro ao gerar PIX.' });
+    }
+  });
+
+  app.get('/api/billing/payment-status/:id', authenticateToken, async (req: any, res) => {
+    try {
+      const payment = await db.get('SELECT status FROM payments WHERE mp_payment_id = ? AND group_id = ?', [req.params.id, req.user.group_id]);
+      if (!payment) return res.status(404).json({ error: 'Pagamento não encontrado.' });
+      res.json({ status: payment.status });
+    } catch (err) {
+      res.status(500).json({ error: 'Erro ao verificar status.' });
     }
   });
 
@@ -618,7 +688,7 @@ async function startServer() {
           JSON.stringify(d.protocolos || []),
           u.hash,
           u.data,
-          u.nome,
+          req.user.name || u.nome,
           u.documento,
           u.organizacao,
           JSON.stringify(u.filtros || null)

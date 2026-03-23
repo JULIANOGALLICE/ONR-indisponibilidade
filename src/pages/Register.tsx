@@ -20,7 +20,10 @@ export function Register() {
     setError('');
     
     try {
-      await axios.post('/api/auth/register', formData);
+      await axios.post('/api/auth/register', {
+        ...formData,
+        appUrl: window.location.origin
+      });
       setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao realizar cadastro.');

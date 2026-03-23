@@ -14,7 +14,10 @@ export function RecoverPassword() {
     setLoading(true);
     setError('');
     try {
-      await axios.post('/api/auth/recover-password', { email });
+      await axios.post('/api/auth/recover-password', { 
+        email,
+        appUrl: window.location.origin
+      });
       setSubmitted(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao processar solicitação.');

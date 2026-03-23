@@ -75,7 +75,7 @@ async function startServer() {
 
   // Auth Routes
   app.post('/api/auth/register', async (req, res) => {
-    const { email, password, name, cpf } = req.body;
+    const { email, password, name, cpf, appUrl: clientUrl } = req.body;
     try {
       const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [email]);
       if (existingUser) return res.status(400).json({ error: 'E-mail já cadastrado.' });
@@ -103,7 +103,7 @@ async function startServer() {
       );
 
       // Send confirmation email
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
       const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
       
       await sendEmail(
@@ -145,8 +145,43 @@ async function startServer() {
     }
   });
 
+  app.post('/api/auth/resend-confirmation', async (req, res) => {
+    const { email, appUrl: clientUrl } = req.body;
+    try {
+      const user = await db.get('SELECT id, name, is_confirmed FROM users WHERE email = ?', [email]);
+      if (!user) return res.status(400).json({ error: 'Usuário não encontrado.' });
+      if (user.is_confirmed) return res.status(400).json({ error: 'E-mail já está confirmado.' });
+
+      const confirmationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
+      await db.run('UPDATE users SET confirmation_token = ? WHERE id = ?', [confirmationToken, user.id]);
+
+      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
+      const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
+
+      await sendEmail(
+        email,
+        'Confirme seu cadastro - Sistema ONR',
+        `
+        <h1>Olá, ${user.name}!</h1>
+        <p>Você solicitou o reenvio do e-mail de confirmação.</p>
+        <p>Para ativar sua conta, clique no link abaixo:</p>
+        <a href="${confirmationLink}">${confirmationLink}</a>
+        <p>O link expira em 24 horas.</p>
+        `
+      );
+
+      res.json({ message: 'E-mail de confirmação reenviado com sucesso.' });
+    } catch (err: any) {
+      console.error(err);
+      if (err.message && err.message.includes('Servidor de e-mail')) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
   app.post('/api/auth/recover-password', async (req, res) => {
-    const { email } = req.body;
+    const { email, appUrl: clientUrl } = req.body;
     try {
       const user = await db.get('SELECT id, name FROM users WHERE email = ?', [email]);
       if (!user) {
@@ -155,7 +190,7 @@ async function startServer() {
       }
 
       const resetToken = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: '1h' });
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
       const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
 
       await sendEmail(

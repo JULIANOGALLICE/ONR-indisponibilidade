@@ -456,16 +456,88 @@ async function startServer() {
     }
   });
 
+  app.post('/api/billing/verify-payment', authenticateToken, async (req: any, res) => {
+    const { payment_id, external_reference } = req.body;
+    
+    if (!payment_id || !external_reference) {
+      return res.status(400).json({ error: 'Dados inválidos.' });
+    }
+
+    try {
+      const settings = await db.get('SELECT mp_access_token FROM system_settings LIMIT 1');
+      if (!settings || !settings.mp_access_token) {
+        return res.status(400).json({ error: 'Mercado Pago não configurado.' });
+      }
+
+      const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${payment_id}`, {
+        headers: { 'Authorization': `Bearer ${settings.mp_access_token}` }
+      });
+
+      const paymentData = mpRes.data;
+      const status = paymentData.status;
+      const paymentExternalRef = paymentData.external_reference;
+
+      if (paymentExternalRef !== external_reference) {
+        return res.status(400).json({ error: 'Referência externa não confere.' });
+      }
+
+      const [groupIdStr, daysStr] = external_reference.split('_');
+      const groupId = parseInt(groupIdStr);
+      const days = parseInt(daysStr);
+
+      if (groupId !== req.user.group_id) {
+        return res.status(403).json({ error: 'Acesso negado.' });
+      }
+
+      // Update payment record
+      const updateRes = await db.run(
+        'UPDATE payments SET status = ?, mp_payment_id = ?, updated_at = CURRENT_TIMESTAMP WHERE external_reference = ? AND status = "pending"',
+        [status, payment_id, external_reference]
+      );
+
+      if (status === 'approved' && updateRes.changes && updateRes.changes > 0) {
+        // Add days to group's expiration_date
+        const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [groupId]);
+        let newExpiration = new Date();
+        
+        if (group && group.expiration_date) {
+          const currentExpiration = new Date(group.expiration_date);
+          if (currentExpiration > newExpiration) {
+            newExpiration = currentExpiration;
+          }
+        }
+        
+        newExpiration.setDate(newExpiration.getDate() + days);
+        
+        await db.run(
+          'UPDATE groups SET expiration_date = ? WHERE id = ?',
+          [newExpiration.toISOString(), groupId]
+        );
+        
+        return res.json({ status: 'approved', expiration_date: newExpiration.toISOString() });
+      }
+
+      // If already processed or not approved
+      const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [groupId]);
+      res.json({ status, expiration_date: group?.expiration_date });
+    } catch (err) {
+      console.error('Verify payment error:', err);
+      res.status(500).json({ error: 'Erro ao verificar pagamento.' });
+    }
+  });
+
   // Webhook Mercado Pago
   app.post('/api/webhooks/mercadopago', async (req, res) => {
-    const { action, data, type } = req.body;
+    const action = req.body.action || req.query.topic || req.query.action;
+    const type = req.body.type || req.query.type;
+    const dataId = req.body.data?.id || req.query['data.id'] || req.query.id;
     
     // Always return 200 OK to Mercado Pago immediately
     res.status(200).send('OK');
 
-    if (type === 'payment' || action === 'payment.created' || action === 'payment.updated') {
+    if (type === 'payment' || action === 'payment' || action === 'payment.created' || action === 'payment.updated') {
       try {
-        const paymentId = data?.id;
+        const paymentId = dataId;
         if (!paymentId) return;
 
         const settings = await db.get('SELECT mp_access_token FROM system_settings LIMIT 1');

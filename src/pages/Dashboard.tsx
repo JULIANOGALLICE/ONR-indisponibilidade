@@ -121,7 +121,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center no-print">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-900">Consultas ONR</h1>
       </div>
 
@@ -134,7 +134,7 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 no-print">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
           <Search className="w-5 h-5 text-indigo-500" />
           Consultar por CPF/CNPJ (Múltiplos)
@@ -166,18 +166,10 @@ export function Dashboard() {
       {/* Results Area */}
       {(results.length > 0 || errors.length > 0) && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center no-print">
-            <h2 className="text-xl font-semibold text-slate-800">Resultados da Consulta</h2>
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm flex items-center gap-2"
-            >
-              Imprimir Resultados
-            </button>
-          </div>
+          <h2 className="text-xl font-semibold text-slate-800">Resultados da Consulta</h2>
           
           {errors.length > 0 && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg no-print">
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
               <h3 className="text-red-800 font-medium mb-2 flex items-center gap-2">
                 <AlertCircle className="w-5 h-5" />
                 Erros ({errors.length})

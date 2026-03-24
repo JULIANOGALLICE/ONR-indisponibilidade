@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Building, Calendar, Edit2, Check, X, Search } from 'lucide-react';
 import axios from 'axios';
+import { Building, Calendar, Edit2, Check, X } from 'lucide-react';
 
 export function Groups() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -8,7 +8,6 @@ export function Groups() {
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDate, setEditDate] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchGroups();
@@ -19,7 +18,7 @@ export function Groups() {
       const res = await axios.get('/api/groups');
       setGroups(res.data);
     } catch (err) {
-      setError('Erro ao carregar assinantes.');
+      setError('Erro ao carregar agrupamentos.');
     } finally {
       setLoading(false);
     }
@@ -42,27 +41,12 @@ export function Groups() {
     }
   };
 
-  const filteredGroups = groups.filter(g => 
-    g.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (g.admin_email && g.admin_email.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
   if (loading) return <div>Carregando...</div>;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-900">Assinantes</h1>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar por nome ou email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-64"
-          />
-        </div>
+        <h1 className="text-2xl font-bold text-slate-900">Agrupamentos (Clientes)</h1>
       </div>
 
       {error && (
@@ -83,7 +67,7 @@ export function Groups() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredGroups.map((group) => (
+            {groups.map((group) => (
               <tr key={group.id} className="hover:bg-slate-50">
                 <td className="p-4 text-sm text-slate-600">{group.id}</td>
                 <td className="p-4 text-sm font-medium text-slate-900 flex items-center gap-2">

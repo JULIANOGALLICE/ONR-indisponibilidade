@@ -5,7 +5,6 @@ import jwt from 'jsonwebtoken';
 import { initDb } from './server/database.ts';
 import path from 'path';
 import axios from 'axios';
-import nodemailer from 'nodemailer';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
 
@@ -17,37 +16,6 @@ async function startServer() {
   app.use(express.json());
 
   const db = await initDb();
-
-  const sendEmail = async (to: string, subject: string, html: string) => {
-    const settings = await db.get('SELECT smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from FROM system_settings LIMIT 1');
-    
-    if (!settings || !settings.smtp_host) {
-      console.log(`[MOCK EMAIL] Para: ${to}\nAssunto: ${subject}\nConteúdo: ${html}`);
-      return;
-    }
-
-    const transporter = nodemailer.createTransport({
-      host: settings.smtp_host,
-      port: settings.smtp_port || 587,
-      secure: settings.smtp_port === 465,
-      auth: {
-        user: settings.smtp_user,
-        pass: settings.smtp_pass,
-      },
-    });
-
-    try {
-      await transporter.sendMail({
-        from: settings.smtp_from || '"Sistema ONR" <noreply@onr.com>',
-        to,
-        subject,
-        html,
-      });
-    } catch (err) {
-      console.error('Erro ao enviar e-mail:', err);
-      throw err;
-    }
-  };
 
   // Middleware to authenticate token
   const authenticateToken = (req: any, res: any, next: any) => {
@@ -92,21 +60,10 @@ async function startServer() {
         [email, hashedPassword, name, cpf, 'admin', groupId, confirmationToken, 0]
       );
 
-      // Send confirmation email
+      // Mock email sending
       const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
-      
-      await sendEmail(
-        email,
-        'Confirme seu cadastro - Sistema ONR',
-        `
-        <h1>Olá, ${name}!</h1>
-        <p>Obrigado por se cadastrar no Sistema ONR.</p>
-        <p>Para ativar sua conta, clique no link abaixo:</p>
-        <a href="${confirmationLink}">${confirmationLink}</a>
-        <p>O link expira em 24 horas.</p>
-        `
-      );
+      console.log(`[MOCK EMAIL] Para: ${email}\nAssunto: Confirme seu cadastro\nLink: ${confirmationLink}`);
 
       res.json({ message: 'Cadastro realizado com sucesso. Verifique seu e-mail para confirmar.' });
     } catch (err) {
@@ -140,57 +97,6 @@ async function startServer() {
       }
 
       res.json({ message: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
-    } catch (err) {
-      res.status(400).json({ error: 'Token inválido ou expirado.' });
-    }
-  });
-
-  app.post('/api/auth/recover-password', async (req, res) => {
-    const { email } = req.body;
-    try {
-      const user = await db.get('SELECT id, name FROM users WHERE email = ?', [email]);
-      if (!user) {
-        // Por segurança, não informamos se o e-mail existe ou não
-        return res.json({ message: 'Se o e-mail estiver cadastrado, você receberá as instruções em instantes.' });
-      }
-
-      const resetToken = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: '1h' });
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-      const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
-
-      await sendEmail(
-        email,
-        'Recuperação de Senha - Sistema ONR',
-        `
-        <h1>Olá, ${user.name || 'Usuário'}!</h1>
-        <p>Recebemos uma solicitação para redefinir sua senha.</p>
-        <p>Para criar uma nova senha, clique no link abaixo:</p>
-        <a href="${resetLink}">${resetLink}</a>
-        <p>Este link é válido por 1 hora.</p>
-        <p>Se você não solicitou a alteração, ignore este e-mail.</p>
-        `
-      );
-
-      res.json({ message: 'Se o e-mail estiver cadastrado, você receberá as instruções em instantes.' });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Erro no servidor.' });
-    }
-  });
-
-  app.post('/api/auth/reset-password', async (req, res) => {
-    const { token, newPassword } = req.body;
-    try {
-      const decoded: any = jwt.verify(token, JWT_SECRET);
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      
-      const result = await db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, decoded.id]);
-      
-      if (result.changes === 0) {
-        return res.status(400).json({ error: 'Usuário não encontrado ou token inválido.' });
-      }
-
-      res.json({ message: 'Senha redefinida com sucesso!' });
     } catch (err) {
       res.status(400).json({ error: 'Token inválido ou expirado.' });
     }
@@ -364,11 +270,11 @@ async function startServer() {
   });
 
   app.post('/api/system-settings', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
-    const { mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from } = req.body;
+    const { mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days } = req.body;
     try {
       await db.run(
-        'UPDATE system_settings SET mp_access_token = ?, mp_public_key = ?, price_30 = ?, price_90 = ?, price_180 = ?, price_365 = ?, trial_days = ?, smtp_host = ?, smtp_port = ?, smtp_user = ?, smtp_pass = ?, smtp_from = ? WHERE id = 1',
-        [mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from]
+        'UPDATE system_settings SET mp_access_token = ?, mp_public_key = ?, price_30 = ?, price_90 = ?, price_180 = ?, price_365 = ?, trial_days = ? WHERE id = 1',
+        [mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days]
       );
       res.json({ message: 'Configurações do sistema atualizadas.' });
     } catch (err) {
@@ -391,72 +297,6 @@ async function startServer() {
         mp_public_key: settings?.mp_public_key,
         expiration_date: group?.expiration_date
       });
-    } catch (err) {
-      res.status(500).json({ error: 'Erro no servidor.' });
-    }
-  });
-
-  app.post('/api/billing/create-pix', authenticateToken, async (req: any, res) => {
-    const { days } = req.body;
-    if (![30, 90, 180, 365].includes(days)) {
-      return res.status(400).json({ error: 'Plano inválido.' });
-    }
-
-    try {
-      const settings = await db.get('SELECT * FROM system_settings LIMIT 1');
-      if (!settings || !settings.mp_access_token) {
-        return res.status(400).json({ error: 'Mercado Pago não configurado.' });
-      }
-
-      const price = settings[`price_${days}`];
-      if (!price || price <= 0) {
-        return res.status(400).json({ error: 'Preço não configurado para este plano.' });
-      }
-
-      const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-      
-      const paymentData = {
-        transaction_amount: Number(price),
-        description: `Licença de ${days} dias - Sistema ONR`,
-        payment_method_id: 'pix',
-        payer: {
-          email: req.user.email
-        },
-        external_reference: external_reference,
-        notification_url: `${appUrl}/api/webhooks/mercadopago`
-      };
-
-      const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', paymentData, {
-        headers: {
-          'Authorization': `Bearer ${settings.mp_access_token}`,
-          'Content-Type': 'application/json',
-          'X-Idempotency-Key': external_reference
-        }
-      });
-
-      await db.run(
-        'INSERT INTO payments (group_id, mp_payment_id, external_reference, status, days, amount) VALUES (?, ?, ?, ?, ?, ?)',
-        [req.user.group_id, mpRes.data.id, external_reference, 'pending', days, price]
-      );
-
-      res.json({
-        id: mpRes.data.id,
-        qr_code: mpRes.data.point_of_interaction.transaction_data.qr_code,
-        qr_code_base64: mpRes.data.point_of_interaction.transaction_data.qr_code_base64,
-        external_reference
-      });
-    } catch (err: any) {
-      console.error('Erro ao criar Pix MP:', err.response?.data || err.message);
-      res.status(500).json({ error: 'Erro ao gerar pagamento Pix.' });
-    }
-  });
-
-  app.get('/api/billing/payment-status/:external_reference', authenticateToken, async (req: any, res) => {
-    try {
-      const payment = await db.get('SELECT status FROM payments WHERE external_reference = ? AND group_id = ?', [req.params.external_reference, req.user.group_id]);
-      if (!payment) return res.status(404).json({ error: 'Pagamento não encontrado.' });
-      res.json({ status: payment.status });
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
     }
@@ -585,7 +425,7 @@ async function startServer() {
   app.get('/api/history', authenticateToken, async (req: any, res) => {
     try {
       const search = req.query.search ? `%${req.query.search}%` : null;
-      let query = 'SELECT history.*, users.email as user_email FROM history JOIN users ON history.user_id = users.id WHERE ';
+      let query = 'SELECT history.* FROM history JOIN users ON history.user_id = users.id WHERE ';
       const params: any[] = [];
 
       if (req.user.role === 'admin') {

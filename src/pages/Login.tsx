@@ -2,51 +2,24 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, Mail, RefreshCw } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showResend, setShowResend] = useState(false);
-  const [resendSuccess, setResendSuccess] = useState('');
-  const [resending, setResending] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setShowResend(false);
-    setResendSuccess('');
     try {
       const res = await axios.post('/api/auth/login', { email, password });
       login(res.data.token, res.data.user);
       navigate('/');
     } catch (err: any) {
-      const errorMessage = err.response?.data?.error || 'Erro ao fazer login';
-      setError(errorMessage);
-      if (errorMessage.includes('confirme seu e-mail')) {
-        setShowResend(true);
-      }
-    }
-  };
-
-  const handleResend = async () => {
-    setResending(true);
-    setError('');
-    setResendSuccess('');
-    try {
-      await axios.post('/api/auth/resend-confirmation', { 
-        email,
-        appUrl: window.location.origin
-      });
-      setResendSuccess('E-mail de confirmação reenviado com sucesso. Verifique sua caixa de entrada.');
-      setShowResend(false);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao reenviar e-mail.');
-    } finally {
-      setResending(false);
+      setError(err.response?.data?.error || 'Erro ao fazer login');
     }
   };
 
@@ -59,24 +32,8 @@ export function Login() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-6 text-sm flex flex-col gap-2">
-            <span>{error}</span>
-            {showResend && (
-              <button 
-                onClick={handleResend}
-                disabled={resending}
-                className="self-start flex items-center gap-1 text-xs font-semibold bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={14} className={resending ? "animate-spin" : ""} />
-                {resending ? 'Reenviando...' : 'Reenviar e-mail de confirmação'}
-              </button>
-            )}
-          </div>
-        )}
-
-        {resendSuccess && (
-          <div className="bg-emerald-50 text-emerald-600 p-3 rounded-lg mb-6 text-sm">
-            {resendSuccess}
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-6 text-sm">
+            {error}
           </div>
         )}
 

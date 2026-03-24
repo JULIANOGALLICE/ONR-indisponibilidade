@@ -10,12 +10,7 @@ export function SystemSettings() {
     price_90: 0,
     price_180: 0,
     price_365: 0,
-    trial_days: 0,
-    smtp_host: '',
-    smtp_port: 587,
-    smtp_user: '',
-    smtp_pass: '',
-    smtp_from: ''
+    trial_days: 0
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -179,62 +174,6 @@ export function SystemSettings() {
                   min="0"
                 />
                 <p className="text-xs text-slate-500 mt-1">Quantidade de dias que o cliente ganha ao confirmar o e-mail.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-slate-200 pt-6 mt-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">Configurações de E-mail (SMTP)</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">E-mail de Remetente</label>
-                <input
-                  type="email"
-                  value={settings.smtp_from || ''}
-                  onChange={(e) => setSettings({ ...settings, smtp_from: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder='"Sistema ONR" <noreply@onr.com>'
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Host SMTP</label>
-                <input
-                  type="text"
-                  value={settings.smtp_host || ''}
-                  onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="smtp.gmail.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Porta SMTP</label>
-                <input
-                  type="number"
-                  value={settings.smtp_port || ''}
-                  onChange={(e) => setSettings({ ...settings, smtp_port: parseInt(e.target.value) || 587 })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="587"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Usuário SMTP</label>
-                <input
-                  type="text"
-                  value={settings.smtp_user || ''}
-                  onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="seu-email@gmail.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Senha SMTP</label>
-                <input
-                  type="password"
-                  value={settings.smtp_pass || ''}
-                  onChange={(e) => setSettings({ ...settings, smtp_pass: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="••••••••"
-                />
               </div>
             </div>
           </div>

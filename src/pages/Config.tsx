@@ -6,7 +6,7 @@ export function Config() {
   const [config, setConfig] = useState({
     client_id: '',
     client_secret: '',
-    environment: 'prod',
+    environment: 'stg',
     cpf_usuario: '',
     template_positive: '',
     template_negative: ''
@@ -105,10 +105,11 @@ export function Config() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Ambiente</label>
               <select
-                value={config.environment || 'prod'}
+                value={config.environment || 'stg'}
                 onChange={(e) => setConfig({ ...config, environment: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
               >
+                <option value="stg">Desenvolvimento (STG)</option>
                 <option value="prod">Produção</option>
               </select>
             </div>

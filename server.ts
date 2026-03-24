@@ -460,18 +460,22 @@ async function startServer() {
 
       const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
       
-      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
+      let appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
+      if (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
       
-      const paymentData = {
+      const paymentData: any = {
         transaction_amount: Number(price),
         description: `Licença de ${days} dias - Sistema ONR`,
         payment_method_id: 'pix',
         payer: {
           email: req.user.email,
         },
-        external_reference: external_reference,
-        notification_url: `${appUrl}/api/webhooks/mercadopago`
+        external_reference: external_reference
       };
+
+      if (!appUrl.includes('localhost')) {
+        paymentData.notification_url = `${appUrl}/api/webhooks/mercadopago`;
+      }
 
       const response = await axios.post('https://api.mercadopago.com/v1/payments', paymentData, {
         headers: {
@@ -573,9 +577,10 @@ async function startServer() {
 
       const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
       
-      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
+      let appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
+      if (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
       
-      const preferenceData = {
+      const preferenceData: any = {
         items: [
           {
             title: `Licença de ${days} dias - Sistema ONR`,
@@ -584,15 +589,21 @@ async function startServer() {
             currency_id: 'BRL'
           }
         ],
+        payer: {
+          email: req.user.email
+        },
         back_urls: {
           success: `${appUrl}/billing?status=success`,
           failure: `${appUrl}/billing?status=failure`,
           pending: `${appUrl}/billing?status=pending`
         },
         auto_return: 'approved',
-        external_reference: external_reference,
-        notification_url: `${appUrl}/api/webhooks/mercadopago`
+        external_reference: external_reference
       };
+
+      if (!appUrl.includes('localhost')) {
+        preferenceData.notification_url = `${appUrl}/api/webhooks/mercadopago`;
+      }
 
       const mpRes = await axios.post('https://api.mercadopago.com/checkout/preferences', preferenceData, {
         headers: {
@@ -609,7 +620,8 @@ async function startServer() {
       res.json({ init_point: mpRes.data.init_point, preference_id: mpRes.data.id });
     } catch (err: any) {
       console.error('Erro ao criar preferência MP:', err.response?.data || err.message);
-      res.status(500).json({ error: 'Erro ao gerar pagamento.' });
+      const mpError = err.response?.data?.cause?.[0]?.description || err.response?.data?.message || err.message || 'Erro ao gerar pagamento.';
+      res.status(500).json({ error: mpError });
     }
   });
 

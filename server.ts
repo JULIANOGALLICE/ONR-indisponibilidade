@@ -422,10 +422,23 @@ async function startServer() {
 
       const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
       
-      let appUrl = req.headers.origin;
-      if (!appUrl || appUrl === 'null') {
-        appUrl = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.get('host')}`;
+      let appUrl = 'https://ais-dev-cugjphin5z7i4prqrovzqf-111282073487.us-east1.run.app'; // Fallback
+      
+      try {
+        if (req.headers.origin && req.headers.origin !== 'null') {
+          appUrl = new URL(req.headers.origin).origin;
+        } else if (req.headers.referer) {
+          appUrl = new URL(req.headers.referer).origin;
+        } else if (process.env.APP_URL) {
+          appUrl = new URL(process.env.APP_URL).origin;
+        } else if (req.headers.host) {
+          const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+          appUrl = `${proto}://${req.headers.host}`;
+        }
+      } catch (e) {
+        console.error('Error parsing URL:', e);
       }
+      
       appUrl = appUrl.replace(/\/$/, '');
       
       const preferenceData = {
@@ -446,6 +459,8 @@ async function startServer() {
         external_reference: external_reference,
         notification_url: `${appUrl}/api/webhooks/mercadopago`
       };
+
+      console.log('Sending preference to MP:', JSON.stringify(preferenceData, null, 2));
 
       const mpRes = await axios.post('https://api.mercadopago.com/checkout/preferences', preferenceData, {
         headers: {

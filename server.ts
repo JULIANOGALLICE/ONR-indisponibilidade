@@ -92,7 +92,10 @@ async function startServer() {
       );
 
       // Send confirmation email
-      const appUrl = req.headers.origin || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
+      let appUrl = req.headers.origin;
+      if (!appUrl || appUrl === 'null') {
+        appUrl = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.get('host')}`;
+      }
       const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
       
       const emailHtml = `
@@ -150,7 +153,10 @@ async function startServer() {
         const resetToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '1h' });
         await db.run('UPDATE users SET confirmation_token = ? WHERE email = ?', [resetToken, email]);
         
-        const appUrl = req.headers.origin || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
+        let appUrl = req.headers.origin;
+        if (!appUrl || appUrl === 'null') {
+          appUrl = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.get('host')}`;
+        }
         const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
         
         const emailHtml = `
@@ -416,7 +422,11 @@ async function startServer() {
 
       const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
       
-      const appUrl = req.headers.origin || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
+      let appUrl = req.headers.origin;
+      if (!appUrl || appUrl === 'null') {
+        appUrl = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.get('host')}`;
+      }
+      appUrl = appUrl.replace(/\/$/, '');
       
       const preferenceData = {
         items: [

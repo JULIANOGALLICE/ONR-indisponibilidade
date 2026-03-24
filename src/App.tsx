@@ -11,6 +11,7 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ConfirmEmail } from './pages/ConfirmEmail';
 import { RecoverPassword } from './pages/RecoverPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Config } from './pages/Config';
 import { Users } from './pages/Users';
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/confirm-email" element={<ConfirmEmail />} />
           <Route path="/recover-password" element={<RecoverPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>

@@ -5,8 +5,39 @@ import jwt from 'jsonwebtoken';
 import { initDb } from './server/database.ts';
 import path from 'path';
 import axios from 'axios';
+import nodemailer from 'nodemailer';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
+
+async function sendEmail(db: any, to: string, subject: string, html: string) {
+  const settings = await db.get('SELECT smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, smtp_from_email, smtp_from_name FROM system_settings LIMIT 1');
+  
+  if (!settings || !settings.smtp_host || !settings.smtp_user || !settings.smtp_pass) {
+    console.log(`[MOCK EMAIL] Para: ${to}\nAssunto: ${subject}\nCorpo: ${html}`);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: settings.smtp_host,
+    port: settings.smtp_port || 587,
+    secure: Boolean(settings.smtp_secure),
+    auth: {
+      user: settings.smtp_user,
+      pass: settings.smtp_pass,
+    },
+  });
+
+  const from = settings.smtp_from_name 
+    ? `"${settings.smtp_from_name}" <${settings.smtp_from_email || settings.smtp_user}>`
+    : settings.smtp_from_email || settings.smtp_user;
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject,
+    html,
+  });
+}
 
 async function startServer() {
   const app = express();
@@ -60,10 +91,19 @@ async function startServer() {
         [email, hashedPassword, name, cpf, 'admin', groupId, confirmationToken, 0]
       );
 
-      // Mock email sending
+      // Send confirmation email
       const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
-      console.log(`[MOCK EMAIL] Para: ${email}\nAssunto: Confirme seu cadastro\nLink: ${confirmationLink}`);
+      
+      const emailHtml = `
+        <h2>Confirme seu cadastro</h2>
+        <p>Olá ${name},</p>
+        <p>Obrigado por se cadastrar. Por favor, clique no link abaixo para confirmar seu e-mail e ativar sua conta:</p>
+        <p><a href="${confirmationLink}">${confirmationLink}</a></p>
+        <p>Se você não solicitou este cadastro, ignore este e-mail.</p>
+      `;
+      
+      await sendEmail(db, email, 'Confirme seu cadastro', emailHtml);
 
       res.json({ message: 'Cadastro realizado com sucesso. Verifique seu e-mail para confirmar.' });
     } catch (err) {
@@ -97,6 +137,52 @@ async function startServer() {
       }
 
       res.json({ message: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
+    } catch (err) {
+      res.status(400).json({ error: 'Token inválido ou expirado.' });
+    }
+  });
+
+  app.post('/api/auth/recover-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+      const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+      if (user) {
+        const resetToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '1h' });
+        await db.run('UPDATE users SET confirmation_token = ? WHERE email = ?', [resetToken, email]);
+        
+        const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+        const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
+        
+        const emailHtml = `
+          <h2>Recuperação de Senha</h2>
+          <p>Olá ${user.name || 'Usuário'},</p>
+          <p>Você solicitou a recuperação de senha. Clique no link abaixo para criar uma nova senha:</p>
+          <p><a href="${resetLink}">${resetLink}</a></p>
+          <p>Se você não solicitou a recuperação de senha, ignore este e-mail.</p>
+        `;
+        
+        await sendEmail(db, email, 'Recuperação de Senha', emailHtml);
+      }
+      // Always return success to prevent email enumeration
+      res.json({ message: 'Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro no servidor.' });
+    }
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    const { token, password } = req.body;
+    try {
+      const decoded: any = jwt.verify(token, JWT_SECRET);
+      const user = await db.get('SELECT * FROM users WHERE email = ? AND confirmation_token = ?', [decoded.email, token]);
+      
+      if (!user) return res.status(400).json({ error: 'Token inválido ou expirado.' });
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await db.run('UPDATE users SET password = ?, confirmation_token = NULL WHERE id = ?', [hashedPassword, user.id]);
+
+      res.json({ message: 'Senha alterada com sucesso.' });
     } catch (err) {
       res.status(400).json({ error: 'Token inválido ou expirado.' });
     }
@@ -270,11 +356,20 @@ async function startServer() {
   });
 
   app.post('/api/system-settings', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
-    const { mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days } = req.body;
+    const { 
+      mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days,
+      smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, smtp_from_email, smtp_from_name
+    } = req.body;
     try {
       await db.run(
-        'UPDATE system_settings SET mp_access_token = ?, mp_public_key = ?, price_30 = ?, price_90 = ?, price_180 = ?, price_365 = ?, trial_days = ? WHERE id = 1',
-        [mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days]
+        `UPDATE system_settings SET 
+          mp_access_token = ?, mp_public_key = ?, price_30 = ?, price_90 = ?, price_180 = ?, price_365 = ?, trial_days = ?,
+          smtp_host = ?, smtp_port = ?, smtp_user = ?, smtp_pass = ?, smtp_secure = ?, smtp_from_email = ?, smtp_from_name = ?
+         WHERE id = 1`,
+        [
+          mp_access_token, mp_public_key, price_30, price_90, price_180, price_365, trial_days,
+          smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure ? 1 : 0, smtp_from_email, smtp_from_name
+        ]
       );
       res.json({ message: 'Configurações do sistema atualizadas.' });
     } catch (err) {

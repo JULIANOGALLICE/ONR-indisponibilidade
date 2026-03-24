@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, CheckCircle, Settings, CreditCard } from 'lucide-react';
+import { Save, CheckCircle, Settings, CreditCard, Mail } from 'lucide-react';
 
 export function SystemSettings() {
   const [settings, setSettings] = useState({
@@ -10,7 +10,14 @@ export function SystemSettings() {
     price_90: 0,
     price_180: 0,
     price_365: 0,
-    trial_days: 0
+    trial_days: 0,
+    smtp_host: '',
+    smtp_port: 587,
+    smtp_user: '',
+    smtp_pass: '',
+    smtp_secure: false,
+    smtp_from_email: '',
+    smtp_from_name: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,7 +32,10 @@ export function SystemSettings() {
     try {
       const res = await axios.get('/api/system-settings');
       if (res.data) {
-        setSettings(res.data);
+        setSettings({
+          ...res.data,
+          smtp_secure: Boolean(res.data.smtp_secure)
+        });
       }
     } catch (err) {
       setError('Erro ao carregar configurações do sistema.');
@@ -174,6 +184,92 @@ export function SystemSettings() {
                   min="0"
                 />
                 <p className="text-xs text-slate-500 mt-1">Quantidade de dias que o cliente ganha ao confirmar o e-mail.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-6 mt-6">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+              <Mail className="w-5 h-5 text-slate-500" /> Configurações de E-mail (SMTP)
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Servidor SMTP</label>
+                <input
+                  type="text"
+                  value={settings.smtp_host || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="smtp.exemplo.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Porta SMTP</label>
+                <input
+                  type="number"
+                  value={settings.smtp_port || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_port: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="587"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Usuário SMTP</label>
+                <input
+                  type="text"
+                  value={settings.smtp_user || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="usuario@exemplo.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Senha SMTP</label>
+                <input
+                  type="password"
+                  value={settings.smtp_pass || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_pass: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">E-mail de Remetente (From)</label>
+                <input
+                  type="email"
+                  value={settings.smtp_from_email || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_from_email: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="contato@exemplo.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Remetente</label>
+                <input
+                  type="text"
+                  value={settings.smtp_from_name || ''}
+                  onChange={(e) => setSettings({ ...settings, smtp_from_name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Minha Empresa"
+                />
+              </div>
+
+              <div className="md:col-span-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="smtp_secure"
+                  checked={settings.smtp_secure || false}
+                  onChange={(e) => setSettings({ ...settings, smtp_secure: e.target.checked })}
+                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                />
+                <label htmlFor="smtp_secure" className="text-sm font-medium text-slate-700">
+                  Usar conexão segura (TLS/SSL)
+                </label>
               </div>
             </div>
           </div>

@@ -5,12 +5,31 @@ import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 export function RecoverPassword() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Em um sistema real, aqui seria feita uma chamada à API para enviar o e-mail de recuperação.
-    // Como não temos um servidor de e-mail configurado, vamos apenas simular o envio.
-    setSubmitted(true);
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('/api/auth/recover-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erro ao enviar e-mail de recuperação.');
+      }
+      
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao enviar e-mail de recuperação.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,6 +60,11 @@ export function RecoverPassword() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center">
+                {error}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">E-mail cadastrado</label>
               <div className="relative">
@@ -60,9 +84,10 @@ export function RecoverPassword() {
 
             <button
               type="submit"
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+              disabled={loading}
+              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-50"
             >
-              Enviar instruções
+              {loading ? 'Enviando...' : 'Enviar instruções'}
             </button>
           </form>
         )}

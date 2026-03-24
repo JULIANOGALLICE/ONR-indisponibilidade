@@ -22,14 +22,14 @@ async function startServer() {
     const settings = await db.get('SELECT smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from FROM system_settings LIMIT 1');
     
     if (!settings || !settings.smtp_host) {
-      console.error(`[MOCK EMAIL] Para: ${to}\nAssunto: ${subject}\nConteúdo: ${html}`);
-      throw new Error('Servidor de e-mail não configurado. Por favor, configure as credenciais SMTP no painel do superusuário.');
+      console.log(`[MOCK EMAIL] Para: ${to}\nAssunto: ${subject}\nConteúdo: ${html}`);
+      return;
     }
 
     const transporter = nodemailer.createTransport({
       host: settings.smtp_host,
-      port: parseInt(settings.smtp_port || '587'),
-      secure: settings.smtp_port === '465',
+      port: settings.smtp_port || 587,
+      secure: settings.smtp_port === 465,
       auth: {
         user: settings.smtp_user,
         pass: settings.smtp_pass,
@@ -45,7 +45,7 @@ async function startServer() {
       });
     } catch (err) {
       console.error('Erro ao enviar e-mail:', err);
-      throw new Error('Falha ao enviar e-mail. Verifique as credenciais SMTP.');
+      throw err;
     }
   };
 
@@ -75,7 +75,7 @@ async function startServer() {
 
   // Auth Routes
   app.post('/api/auth/register', async (req, res) => {
-    const { email, password, name, cpf, appUrl: clientUrl } = req.body;
+    const { email, password, name, cpf } = req.body;
     try {
       const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [email]);
       if (existingUser) return res.status(400).json({ error: 'E-mail já cadastrado.' });
@@ -83,18 +83,8 @@ async function startServer() {
       const hashedPassword = await bcrypt.hash(password, 10);
       const confirmationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
 
-      const settings = await db.get('SELECT trial_days FROM system_settings LIMIT 1');
-      const trialDays = settings?.trial_days || 0;
-      
-      let expirationDate = null;
-      if (trialDays > 0) {
-        const date = new Date();
-        date.setDate(date.getDate() + trialDays);
-        expirationDate = date.toISOString();
-      }
-
       // Create a new group for this client
-      const groupResult = await db.run('INSERT INTO groups (name, expiration_date) VALUES (?, ?)', [`Assinante de ${name}`, expirationDate]);
+      const groupResult = await db.run('INSERT INTO groups (name) VALUES (?)', [`Grupo de ${name}`]);
       const groupId = groupResult.lastID;
 
       await db.run(
@@ -103,7 +93,7 @@ async function startServer() {
       );
 
       // Send confirmation email
-      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
       
       await sendEmail(
@@ -119,11 +109,8 @@ async function startServer() {
       );
 
       res.json({ message: 'Cadastro realizado com sucesso. Verifique seu e-mail para confirmar.' });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      if (err.message && err.message.includes('Servidor de e-mail')) {
-        return res.status(500).json({ error: err.message });
-      }
       res.status(500).json({ error: 'Erro no servidor.' });
     }
   });
@@ -132,19 +119,25 @@ async function startServer() {
     const { token } = req.params;
     try {
       const decoded: any = jwt.verify(token, JWT_SECRET);
-      const user = await db.get('SELECT * FROM users WHERE email = ?', [decoded.email]);
+      const user = await db.get('SELECT * FROM users WHERE email = ? AND confirmation_token = ?', [decoded.email, token]);
       
-      if (!user) return res.status(400).json({ error: 'Usuário não encontrado.' });
-      
-      if (user.is_confirmed) {
-        return res.json({ message: 'E-mail já confirmado! Você já pode fazer login.' });
-      }
+      if (!user) return res.status(400).json({ error: 'Token inválido ou expirado.' });
+      if (user.is_confirmed) return res.json({ message: 'E-mail já confirmado.' });
 
-      if (user.confirmation_token !== token) {
-        return res.status(400).json({ error: 'Token inválido ou expirado.' });
+      const settings = await db.get('SELECT trial_days FROM system_settings LIMIT 1');
+      const trialDays = settings?.trial_days || 0;
+      
+      let expirationDate = null;
+      if (trialDays > 0) {
+        const date = new Date();
+        date.setDate(date.getDate() + trialDays);
+        expirationDate = date.toISOString();
       }
 
       await db.run('UPDATE users SET is_confirmed = 1, confirmation_token = NULL WHERE id = ?', [user.id]);
+      if (expirationDate) {
+        await db.run('UPDATE groups SET expiration_date = ? WHERE id = ?', [expirationDate, user.group_id]);
+      }
 
       res.json({ message: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
     } catch (err) {
@@ -152,43 +145,8 @@ async function startServer() {
     }
   });
 
-  app.post('/api/auth/resend-confirmation', async (req, res) => {
-    const { email, appUrl: clientUrl } = req.body;
-    try {
-      const user = await db.get('SELECT id, name, is_confirmed FROM users WHERE email = ?', [email]);
-      if (!user) return res.status(400).json({ error: 'Usuário não encontrado.' });
-      if (user.is_confirmed) return res.status(400).json({ error: 'E-mail já está confirmado.' });
-
-      const confirmationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
-      await db.run('UPDATE users SET confirmation_token = ? WHERE id = ?', [confirmationToken, user.id]);
-
-      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
-      const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
-
-      await sendEmail(
-        email,
-        'Confirme seu cadastro - Sistema ONR',
-        `
-        <h1>Olá, ${user.name}!</h1>
-        <p>Você solicitou o reenvio do e-mail de confirmação.</p>
-        <p>Para ativar sua conta, clique no link abaixo:</p>
-        <a href="${confirmationLink}">${confirmationLink}</a>
-        <p>O link expira em 24 horas.</p>
-        `
-      );
-
-      res.json({ message: 'E-mail de confirmação reenviado com sucesso.' });
-    } catch (err: any) {
-      console.error(err);
-      if (err.message && err.message.includes('Servidor de e-mail')) {
-        return res.status(500).json({ error: err.message });
-      }
-      res.status(500).json({ error: 'Erro no servidor.' });
-    }
-  });
-
   app.post('/api/auth/recover-password', async (req, res) => {
-    const { email, appUrl: clientUrl } = req.body;
+    const { email } = req.body;
     try {
       const user = await db.get('SELECT id, name FROM users WHERE email = ?', [email]);
       if (!user) {
@@ -197,7 +155,7 @@ async function startServer() {
       }
 
       const resetToken = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: '1h' });
-      const appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
 
       await sendEmail(
@@ -214,11 +172,8 @@ async function startServer() {
       );
 
       res.json({ message: 'Se o e-mail estiver cadastrado, você receberá as instruções em instantes.' });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      if (err.message && err.message.includes('Servidor de e-mail')) {
-        return res.status(500).json({ error: err.message });
-      }
       res.status(500).json({ error: 'Erro no servidor.' });
     }
   });
@@ -254,8 +209,8 @@ async function startServer() {
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) return res.status(400).json({ error: 'Senha incorreta.' });
 
-      const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role, group_id: user.group_id }, JWT_SECRET, { expiresIn: '24h' });
-      res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, group_id: user.group_id } });
+      const token = jwt.sign({ id: user.id, email: user.email, role: user.role, group_id: user.group_id }, JWT_SECRET, { expiresIn: '24h' });
+      res.json({ token, user: { id: user.id, email: user.email, role: user.role, group_id: user.group_id } });
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
     }
@@ -442,7 +397,7 @@ async function startServer() {
   });
 
   app.post('/api/billing/create-pix', authenticateToken, async (req: any, res) => {
-    const { days, appUrl: clientUrl } = req.body;
+    const { days } = req.body;
     if (![30, 90, 180, 365].includes(days)) {
       return res.status(400).json({ error: 'Plano inválido.' });
     }
@@ -459,107 +414,56 @@ async function startServer() {
       }
 
       const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       
-      let appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
-      if (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
-      
-      const paymentData: any = {
+      const paymentData = {
         transaction_amount: Number(price),
         description: `Licença de ${days} dias - Sistema ONR`,
         payment_method_id: 'pix',
         payer: {
-          email: req.user.email,
+          email: req.user.email
         },
-        external_reference: external_reference
+        external_reference: external_reference,
+        notification_url: `${appUrl}/api/webhooks/mercadopago`
       };
 
-      if (appUrl.startsWith('https://')) {
-        paymentData.notification_url = `${appUrl}/api/webhooks/mercadopago`;
-      }
-
-      const response = await axios.post('https://api.mercadopago.com/v1/payments', paymentData, {
+      const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', paymentData, {
         headers: {
           'Authorization': `Bearer ${settings.mp_access_token}`,
+          'Content-Type': 'application/json',
           'X-Idempotency-Key': external_reference
         }
       });
 
-      const payment = response.data;
-      
       await db.run(
         'INSERT INTO payments (group_id, mp_payment_id, external_reference, status, days, amount) VALUES (?, ?, ?, ?, ?, ?)',
-        [req.user.group_id, payment.id, external_reference, payment.status, days, price]
+        [req.user.group_id, mpRes.data.id, external_reference, 'pending', days, price]
       );
 
       res.json({
-        id: payment.id,
-        qr_code: payment.point_of_interaction.transaction_data.qr_code,
-        qr_code_base64: payment.point_of_interaction.transaction_data.qr_code_base64,
+        id: mpRes.data.id,
+        qr_code: mpRes.data.point_of_interaction.transaction_data.qr_code,
+        qr_code_base64: mpRes.data.point_of_interaction.transaction_data.qr_code_base64,
         external_reference
       });
     } catch (err: any) {
-      console.error('Erro ao criar PIX:', err.response?.data || err.message);
-      res.status(500).json({ error: 'Erro ao gerar PIX.' });
+      console.error('Erro ao criar Pix MP:', err.response?.data || err.message);
+      res.status(500).json({ error: 'Erro ao gerar pagamento Pix.' });
     }
   });
 
-  app.get('/api/billing/payment-status/:id', authenticateToken, async (req: any, res) => {
+  app.get('/api/billing/payment-status/:external_reference', authenticateToken, async (req: any, res) => {
     try {
-      const payment = await db.get('SELECT status, external_reference, days FROM payments WHERE mp_payment_id = ? AND group_id = ?', [req.params.id, req.user.group_id]);
+      const payment = await db.get('SELECT status FROM payments WHERE external_reference = ? AND group_id = ?', [req.params.external_reference, req.user.group_id]);
       if (!payment) return res.status(404).json({ error: 'Pagamento não encontrado.' });
-      
-      // If still pending, check Mercado Pago directly as a fallback to the webhook
-      if (payment.status === 'pending') {
-        const settings = await db.get('SELECT mp_access_token FROM system_settings LIMIT 1');
-        if (settings && settings.mp_access_token) {
-          try {
-            const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${req.params.id}`, {
-              headers: { 'Authorization': `Bearer ${settings.mp_access_token}` }
-            });
-            
-            const newStatus = mpRes.data.status;
-            if (newStatus === 'approved') {
-              // Update payment record
-              const updateRes = await db.run(
-                'UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE mp_payment_id = ? AND status = "pending"',
-                [newStatus, req.params.id]
-              );
-              
-              if (updateRes.changes && updateRes.changes > 0) {
-                // Add days to group's expiration_date
-                const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [req.user.group_id]);
-                let newExpiration = new Date();
-                
-                if (group && group.expiration_date) {
-                  const currentExpiration = new Date(group.expiration_date);
-                  if (currentExpiration > newExpiration) {
-                    newExpiration = currentExpiration;
-                  }
-                }
-                
-                newExpiration.setDate(newExpiration.getDate() + payment.days);
-                
-                await db.run(
-                  'UPDATE groups SET expiration_date = ? WHERE id = ?',
-                  [newExpiration.toISOString(), req.user.group_id]
-                );
-              }
-              return res.json({ status: newStatus });
-            }
-          } catch (mpErr) {
-            console.error('Erro ao consultar MP diretamente:', mpErr);
-          }
-        }
-      }
-
       res.json({ status: payment.status });
     } catch (err) {
-      res.status(500).json({ error: 'Erro ao verificar status.' });
+      res.status(500).json({ error: 'Erro no servidor.' });
     }
   });
 
   app.post('/api/billing/create-preference', authenticateToken, async (req: any, res) => {
-    const { days, appUrl: clientUrl } = req.body;
+    const { days } = req.body;
     if (![30, 90, 180, 365].includes(days)) {
       return res.status(400).json({ error: 'Plano inválido.' });
     }
@@ -577,12 +481,9 @@ async function startServer() {
 
       const external_reference = `${req.user.group_id}_${days}_${Date.now()}`;
       
-      let appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
-      if (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       
-      console.log('Creating preference with appUrl:', appUrl);
-      
-      const preferenceData: any = {
+      const preferenceData = {
         items: [
           {
             title: `Licença de ${days} dias - Sistema ONR`,
@@ -591,25 +492,15 @@ async function startServer() {
             currency_id: 'BRL'
           }
         ],
-        payer: {
-          email: req.user.email
-        },
-        external_reference: external_reference
-      };
-
-      // Mercado Pago requires HTTPS for back_urls (except localhost)
-      if (appUrl.startsWith('https://') || appUrl.includes('localhost')) {
-        preferenceData.back_urls = {
+        back_urls: {
           success: `${appUrl}/billing?status=success`,
           failure: `${appUrl}/billing?status=failure`,
           pending: `${appUrl}/billing?status=pending`
-        };
-        preferenceData.auto_return = 'approved';
-      }
-
-      if (appUrl.startsWith('https://')) {
-        preferenceData.notification_url = `${appUrl}/api/webhooks/mercadopago`;
-      }
+        },
+        auto_return: 'approved',
+        external_reference: external_reference,
+        notification_url: `${appUrl}/api/webhooks/mercadopago`
+      };
 
       const mpRes = await axios.post('https://api.mercadopago.com/checkout/preferences', preferenceData, {
         headers: {
@@ -626,8 +517,7 @@ async function startServer() {
       res.json({ init_point: mpRes.data.init_point, preference_id: mpRes.data.id });
     } catch (err: any) {
       console.error('Erro ao criar preferência MP:', err.response?.data || err.message);
-      const mpError = err.response?.data?.cause?.[0]?.description || err.response?.data?.message || err.message || 'Erro ao gerar pagamento.';
-      res.status(500).json({ error: mpError });
+      res.status(500).json({ error: 'Erro ao gerar pagamento.' });
     }
   });
 
@@ -695,7 +585,7 @@ async function startServer() {
   app.get('/api/history', authenticateToken, async (req: any, res) => {
     try {
       const search = req.query.search ? `%${req.query.search}%` : null;
-      let query = 'SELECT history.* FROM history JOIN users ON history.user_id = users.id WHERE ';
+      let query = 'SELECT history.*, users.email as user_email FROM history JOIN users ON history.user_id = users.id WHERE ';
       const params: any[] = [];
 
       if (req.user.role === 'admin') {
@@ -796,7 +686,7 @@ async function startServer() {
           JSON.stringify(d.protocolos || []),
           u.hash,
           u.data,
-          req.user.name || u.nome,
+          u.nome,
           u.documento,
           u.organizacao,
           JSON.stringify(u.filtros || null)

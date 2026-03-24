@@ -38,9 +38,12 @@ export default function App() {
               <Route path="/history" element={<History />} />
               <Route path="/change-password" element={<ChangePassword />} />
               
+              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                <Route path="/users" element={<Users />} />
+              </Route>
+
               <Route element={<ProtectedRoute allowedRoles={['superadmin', 'admin']} />}>
                 <Route path="/config" element={<Config />} />
-                <Route path="/users" element={<Users />} />
                 <Route path="/billing" element={<Billing />} />
               </Route>
 

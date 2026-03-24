@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Building, Calendar, Edit2, Check, X, Search } from 'lucide-react';
+import axios from 'axios';
 
 export function Groups() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -19,7 +19,7 @@ export function Groups() {
       const res = await axios.get('/api/groups');
       setGroups(res.data);
     } catch (err) {
-      setError('Erro ao carregar agrupamentos.');
+      setError('Erro ao carregar assinantes.');
     } finally {
       setLoading(false);
     }
@@ -53,17 +53,14 @@ export function Groups() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-900">Assinantes</h1>
-      </div>
-
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar por nome ou email do assinante..."
+            placeholder="Buscar por nome ou email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-64"
           />
         </div>
       </div>
@@ -127,13 +124,6 @@ export function Groups() {
                 </td>
               </tr>
             ))}
-            {filteredGroups.length === 0 && (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-slate-500">
-                  Nenhum assinante encontrado.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>

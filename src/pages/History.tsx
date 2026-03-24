@@ -139,6 +139,7 @@ export function History() {
                       <div className="flex flex-col">
                         <span className="font-medium text-gray-900">{item.nome || '-'}</span>
                         <span className="text-xs text-gray-500">{item.documento_usuario}</span>
+                        {item.user_email && <span className="text-xs text-indigo-600">{item.user_email}</span>}
                       </div>
                     </td>
                     <td className="p-4 text-sm text-gray-600">
@@ -161,9 +162,11 @@ export function History() {
                     <td className="p-4 text-sm text-gray-600">
                       {item.indisponivel && protocolos.length > 0 ? (
                         <div className="flex flex-col gap-1">
-                          <span className="inline-block bg-gray-100 px-2 py-1 rounded text-xs">
-                            {protocolos[0]}
-                          </span>
+                          {protocolos.slice(0, 1).map((p, i) => (
+                            <span key={i} className="inline-block bg-gray-100 px-2 py-1 rounded text-xs truncate max-w-[150px]" title={p}>
+                              {p}
+                            </span>
+                          ))}
                           {protocolos.length > 1 && (
                             <span className="inline-block bg-gray-200 px-2 py-1 rounded text-xs text-gray-500 font-medium text-center" title={`${protocolos.length - 1} mais protocolos ocultos`}>
                               +{protocolos.length - 1}

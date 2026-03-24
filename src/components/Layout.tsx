@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LogOut, Users, Settings, Search, KeyRound, History, Building, CreditCard, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 
 export function Layout() {
@@ -12,10 +12,10 @@ export function Layout() {
   const [expirationDate, setExpirationDate] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && user.role !== 'superadmin') {
+    if (user) {
       axios.get('/api/billing/plans')
         .then(res => setExpirationDate(res.data.expiration_date))
-        .catch(err => console.error('Failed to fetch billing info', err));
+        .catch(() => {});
     }
   }, [user]);
 
@@ -28,18 +28,23 @@ export function Layout() {
     { path: '/', label: 'Consultas API', icon: Search, roles: ['superadmin', 'admin', 'user'] },
     { path: '/history', label: 'Histórico', icon: History, roles: ['superadmin', 'admin', 'user'] },
     { path: '/config', label: 'Configurações ONR', icon: Settings, roles: ['superadmin', 'admin'] },
-    { path: '/users', label: 'Usuários', icon: Users, roles: ['superadmin', 'admin'] },
+    { path: '/users', label: 'Usuários', icon: Users, roles: ['admin'] },
     { path: '/groups', label: 'Assinantes', icon: Building, roles: ['superadmin'] },
     { path: '/system-settings', label: 'Config. Sistema', icon: ShieldAlert, roles: ['superadmin'] },
     { path: '/billing', label: 'Assinatura', icon: CreditCard, roles: ['superadmin', 'admin'] },
     { path: '/change-password', label: 'Alterar Senha', icon: KeyRound, roles: ['superadmin', 'admin', 'user'] },
   ];
 
-  let remainingDays = null;
-  if (expirationDate) {
-    const diffTime = new Date(expirationDate).getTime() - new Date().getTime();
-    remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }
+  const calculateRemainingDays = () => {
+    if (!expirationDate) return null;
+    const expDate = new Date(expirationDate);
+    const today = new Date();
+    const diffTime = expDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const remainingDays = calculateRemainingDays();
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -51,14 +56,31 @@ export function Layout() {
             Logado como: <span className="text-emerald-400">{user?.email}</span>
           </p>
           <p className="text-xs text-slate-500 uppercase tracking-wider mt-1">{user?.role}</p>
+          
+          {remainingDays !== null && (
+            <div className="mt-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
+              <p className="text-xs text-slate-400 mb-1">Licença Restante</p>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "text-lg font-bold",
+                  remainingDays > 5 ? "text-emerald-400" : remainingDays > 0 ? "text-amber-400" : "text-red-400"
+                )}>
+                  {remainingDays > 0 ? `${remainingDays} dias` : 'Expirada'}
+                </span>
+                {remainingDays === 1 && (
+                  <AlertTriangle className="w-4 h-4 text-amber-400 animate-pulse" />
+                )}
+              </div>
+              {remainingDays === 1 && (
+                <p className="text-xs text-amber-400 mt-1 font-medium">Sua licença expira amanhã!</p>
+              )}
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 px-4 space-y-2">
           {navItems.map((item) => {
             if (!user || !item.roles.includes(user.role)) return null;
-            // Hide Users and Billing for superadmin as requested
-            if (user.role === 'superadmin' && (item.path === '/users' || item.path === '/billing')) return null;
-
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
             return (
@@ -91,32 +113,8 @@ export function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto flex flex-col">
-        {/* Top bar for license warning */}
-        {user?.role !== 'superadmin' && remainingDays !== null && (
-          <div className={cn(
-            "px-8 py-3 flex items-center justify-between text-sm font-medium",
-            remainingDays <= 1 ? "bg-red-500 text-white" : 
-            remainingDays <= 5 ? "bg-amber-500 text-white" : 
-            "bg-white border-b border-slate-200 text-slate-600"
-          )}>
-            <div className="flex items-center gap-2">
-              {(remainingDays <= 5) && <AlertTriangle className="w-4 h-4" />}
-              <span>
-                {remainingDays > 0 
-                  ? `Sua licença expira em ${remainingDays} dia${remainingDays === 1 ? '' : 's'}.` 
-                  : 'Sua licença expirou.'}
-              </span>
-            </div>
-            {remainingDays <= 5 && user?.role === 'admin' && (
-              <Link to="/billing" className="underline hover:text-white/80">
-                Renovar agora
-              </Link>
-            )}
-          </div>
-        )}
-        
-        <div className="p-8 max-w-6xl mx-auto w-full">
+      <main className="flex-1 overflow-auto">
+        <div className="p-8 max-w-6xl mx-auto">
           <Outlet />
         </div>
       </main>

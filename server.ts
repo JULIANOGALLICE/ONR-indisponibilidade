@@ -473,7 +473,7 @@ async function startServer() {
         external_reference: external_reference
       };
 
-      if (!appUrl.includes('localhost')) {
+      if (appUrl.startsWith('https://')) {
         paymentData.notification_url = `${appUrl}/api/webhooks/mercadopago`;
       }
 
@@ -580,6 +580,8 @@ async function startServer() {
       let appUrl = clientUrl || process.env.APP_URL || `http://localhost:${PORT}`;
       if (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
       
+      console.log('Creating preference with appUrl:', appUrl);
+      
       const preferenceData: any = {
         items: [
           {
@@ -592,16 +594,20 @@ async function startServer() {
         payer: {
           email: req.user.email
         },
-        back_urls: {
-          success: `${appUrl}/billing?status=success`,
-          failure: `${appUrl}/billing?status=failure`,
-          pending: `${appUrl}/billing?status=pending`
-        },
-        auto_return: 'approved',
         external_reference: external_reference
       };
 
-      if (!appUrl.includes('localhost')) {
+      // Mercado Pago requires HTTPS for back_urls (except localhost)
+      if (appUrl.startsWith('https://') || appUrl.includes('localhost')) {
+        preferenceData.back_urls = {
+          success: `${appUrl}/billing?status=success`,
+          failure: `${appUrl}/billing?status=failure`,
+          pending: `${appUrl}/billing?status=pending`
+        };
+        preferenceData.auto_return = 'approved';
+      }
+
+      if (appUrl.startsWith('https://')) {
         preferenceData.notification_url = `${appUrl}/api/webhooks/mercadopago`;
       }
 

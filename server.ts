@@ -25,6 +25,12 @@ async function sendEmail(db: any, to: string, subject: string, html: string) {
       user: settings.smtp_user,
       pass: settings.smtp_pass,
     },
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
   });
 
   const from = settings.smtp_from_name 
@@ -399,6 +405,12 @@ async function startServer() {
           user: smtp_user,
           pass: smtp_pass,
         },
+        tls: {
+          rejectUnauthorized: false
+        },
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 30000,
       });
 
       const from = smtp_from_name 

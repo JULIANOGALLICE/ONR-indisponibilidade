@@ -383,6 +383,42 @@ async function startServer() {
     }
   });
 
+  app.post('/api/system-settings/test-email', authenticateToken, authorizeRole(['superadmin']), async (req: any, res) => {
+    const { smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, smtp_from_email, smtp_from_name, test_email_to } = req.body;
+
+    if (!smtp_host || !smtp_user || !smtp_pass) {
+      return res.status(400).json({ error: 'Preencha os campos obrigatórios (Host, Usuário e Senha) para testar.' });
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtp_host,
+        port: smtp_port || 587,
+        secure: Boolean(smtp_secure),
+        auth: {
+          user: smtp_user,
+          pass: smtp_pass,
+        },
+      });
+
+      const from = smtp_from_name 
+        ? `"${smtp_from_name}" <${smtp_from_email || smtp_user}>`
+        : smtp_from_email || smtp_user;
+
+      await transporter.sendMail({
+        from,
+        to: test_email_to || req.user.email,
+        subject: 'Teste de Configuração SMTP - Sistema ONR',
+        html: '<p>Este é um e-mail de teste para verificar as configurações SMTP do Sistema ONR.</p><p>Se você recebeu esta mensagem, suas configurações estão corretas!</p>',
+      });
+
+      res.json({ message: 'E-mail de teste enviado com sucesso!' });
+    } catch (err: any) {
+      console.error('Erro ao enviar e-mail de teste:', err);
+      res.status(500).json({ error: `Falha ao enviar: ${err.message}` });
+    }
+  });
+
   // Billing Routes
   app.get('/api/billing/plans', authenticateToken, async (req: any, res) => {
     try {
@@ -651,9 +687,7 @@ async function startServer() {
       throw new Error('Configurações do ONR não definidas para este grupo.');
     }
 
-    const authUrl = config.environment === 'prod' 
-      ? 'https://auth.id.onr.org.br/connect/token' 
-      : 'https://stg-auth.id.onr.org.br/connect/token';
+    const authUrl = 'https://auth.id.onr.org.br/connect/token';
 
     try {
       const response = await axios.post(authUrl, new URLSearchParams({
@@ -668,12 +702,15 @@ async function startServer() {
       return { token: response.data.access_token, config };
     } catch (err: any) {
       console.error('ONR Auth API Error:', err.response?.data || err.message);
+      if (err.response?.data?.error === 'invalid_client') {
+        throw new Error('Credenciais inválidas (invalid_client). Verifique se o Client ID e Client Secret estão corretos nas configurações.');
+      }
       throw err;
     }
   };
 
-  const getBaseUrl = (env: string) => {
-    return env === 'prod' ? 'https://serventia-api.onr.org.br' : 'https://stg-serventia-api.onr.org.br';
+  const getBaseUrl = () => {
+    return 'https://serventia-api.onr.org.br';
   };
 
   app.post('/api/onr/consultar', authenticateToken, async (req: any, res) => {
@@ -688,7 +725,7 @@ async function startServer() {
       }
 
       const { token, config } = await getOnrToken(req.user.group_id);
-      const baseUrl = getBaseUrl(config.environment);
+      const baseUrl = getBaseUrl();
       
       const payload = {
         ...req.body,
@@ -735,7 +772,7 @@ async function startServer() {
   app.post('/api/onr/responder', authenticateToken, async (req: any, res) => {
     try {
       const { token, config } = await getOnrToken(req.user.group_id);
-      const baseUrl = getBaseUrl(config.environment);
+      const baseUrl = getBaseUrl();
       
       const payload = {
         ...req.body,
@@ -754,7 +791,7 @@ async function startServer() {
   app.post('/api/onr/responder/lista', authenticateToken, async (req: any, res) => {
     try {
       const { token, config } = await getOnrToken(req.user.group_id);
-      const baseUrl = getBaseUrl(config.environment);
+      const baseUrl = getBaseUrl();
       
       const payload = {
         ...req.body,
@@ -773,7 +810,7 @@ async function startServer() {
   app.post('/api/onr/documentos/tipos', authenticateToken, async (req: any, res) => {
     try {
       const { token, config } = await getOnrToken(req.user.group_id);
-      const baseUrl = getBaseUrl(config.environment);
+      const baseUrl = getBaseUrl();
       
       const response = await axios.post(`${baseUrl}/api/documentos/tipos`, req.body, {
         headers: { Authorization: `Bearer ${token}` }

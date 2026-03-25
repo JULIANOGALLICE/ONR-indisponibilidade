@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, CheckCircle, Settings, CreditCard, Mail } from 'lucide-react';
+import { Save, CheckCircle, Settings, CreditCard, Mail, AlertCircle } from 'lucide-react';
 
 export function SystemSettings() {
   const [settings, setSettings] = useState({
@@ -23,6 +23,10 @@ export function SystemSettings() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testEmailSuccess, setTestEmailSuccess] = useState('');
+  const [testEmailError, setTestEmailError] = useState('');
 
   useEffect(() => {
     fetchSettings();
@@ -41,6 +45,23 @@ export function SystemSettings() {
       setError('Erro ao carregar configurações do sistema.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    setTestEmailSuccess('');
+    setTestEmailError('');
+    
+    try {
+      const res = await axios.post('/api/system-settings/test-email', settings);
+      setTestEmailSuccess(res.data.message || 'E-mail de teste enviado com sucesso!');
+      setTimeout(() => setTestEmailSuccess(''), 5000);
+    } catch (err: any) {
+      setTestEmailError(err.response?.data?.error || 'Erro ao enviar e-mail de teste.');
+      setTimeout(() => setTestEmailError(''), 5000);
+    } finally {
+      setTestingEmail(false);
     }
   };
 
@@ -270,6 +291,34 @@ export function SystemSettings() {
                 <label htmlFor="smtp_secure" className="text-sm font-medium text-slate-700">
                   Usar conexão segura (TLS/SSL)
                 </label>
+              </div>
+
+              <div className="md:col-span-2 pt-2 border-t border-slate-100 mt-2">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={handleTestEmail}
+                    disabled={testingEmail || !settings.smtp_host || !settings.smtp_user || !settings.smtp_pass}
+                    className="flex items-center gap-2 bg-slate-100 text-slate-700 py-2 px-4 rounded-lg font-medium hover:bg-slate-200 disabled:opacity-50 transition-colors"
+                  >
+                    <Mail className="w-4 h-4" />
+                    {testingEmail ? 'Enviando...' : 'Testar Configurações de E-mail'}
+                  </button>
+                  
+                  {testEmailSuccess && (
+                    <span className="text-sm text-emerald-600 flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4" /> {testEmailSuccess}
+                    </span>
+                  )}
+                  {testEmailError && (
+                    <span className="text-sm text-red-600 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" /> {testEmailError}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  O e-mail de teste será enviado para o seu endereço de e-mail atual usando os dados preenchidos acima.
+                </p>
               </div>
             </div>
           </div>

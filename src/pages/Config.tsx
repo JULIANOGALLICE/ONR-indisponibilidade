@@ -102,18 +102,7 @@ export function Config() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Ambiente</label>
-              <select
-                value={config.environment || 'prod'}
-                onChange={(e) => setConfig({ ...config, environment: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="prod">Produção</option>
-              </select>
-            </div>
-
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">CPF do Usuário (Padrão)</label>
               <input
                 type="text"

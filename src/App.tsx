@@ -21,7 +21,6 @@ import { Groups } from './pages/Groups';
 import { SystemSettings } from './pages/SystemSettings';
 import { Billing } from './pages/Billing';
 import { Payments } from './pages/Payments';
-import { DatabaseConfig } from './pages/DatabaseConfig';
 
 export default function App() {
   return (
@@ -50,7 +49,6 @@ export default function App() {
                 <Route path="/groups" element={<Groups />} />
                 <Route path="/system-settings" element={<SystemSettings />} />
                 <Route path="/payments" element={<Payments />} />
-                <Route path="/database" element={<DatabaseConfig />} />
               </Route>
             </Route>
           </Route>

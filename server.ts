@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { initDb, dbWrapper } from './server/database.ts';
+import { initDb } from './server/database.ts';
 import path from 'path';
 import axios from 'axios';
 import nodemailer from 'nodemailer';
@@ -377,91 +377,6 @@ async function startServer() {
       res.json({ message: 'Data de expiração atualizada com sucesso.' });
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
-    }
-  });
-
-  // Database Config Routes (SuperAdmin)
-  app.get('/api/db-config', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
-    try {
-      res.json({ type: dbWrapper.type });
-    } catch (err) {
-      res.status(500).json({ error: 'Erro no servidor.' });
-    }
-  });
-
-  app.post('/api/db-config/switch', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
-    try {
-      const { type } = req.body;
-      if (type !== 'sqlite' && type !== 'mysql') {
-        return res.status(400).json({ error: 'Tipo de banco de dados inválido.' });
-      }
-      await dbWrapper.switchDb(type);
-      res.json({ success: true, type: dbWrapper.type });
-    } catch (err: any) {
-      res.status(500).json({ error: 'Erro ao trocar banco de dados: ' + err.message });
-    }
-  });
-
-  app.post('/api/db-config/migrate', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
-    try {
-      const { from, to } = req.body;
-      if (from === to || !['sqlite', 'mysql'].includes(from) || !['sqlite', 'mysql'].includes(to)) {
-        return res.status(400).json({ error: 'Parâmetros de migração inválidos.' });
-      }
-
-      const sqliteDb = dbWrapper.getSqlite();
-      const mysqlPool = dbWrapper.getMysql();
-
-      if (!sqliteDb || !mysqlPool) {
-        return res.status(400).json({ error: 'Ambos os bancos devem estar inicializados para migração.' });
-      }
-
-      const tables = ['users', 'config', 'groups', 'history', 'system_settings', 'payments'];
-
-      for (const table of tables) {
-        let sourceData = [];
-        if (from === 'sqlite') {
-          sourceData = await sqliteDb.all(`SELECT * FROM ${table}`);
-        } else {
-          const [rows] = await mysqlPool.execute(`SELECT * FROM ${table}`);
-          sourceData = rows;
-        }
-
-        if (sourceData.length > 0) {
-          // Clear target table
-          if (to === 'sqlite') {
-            await sqliteDb.run(`DELETE FROM ${table}`);
-          } else {
-            await mysqlPool.execute(`DELETE FROM ${table}`);
-          }
-
-          // Insert data
-          const columns = Object.keys(sourceData[0]);
-          const placeholders = columns.map(() => '?').join(', ');
-          const sql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
-
-          for (const row of sourceData) {
-            const values = columns.map(col => {
-              let val = row[col];
-              if (val === undefined) return null;
-              if (val instanceof Date) {
-                return val.toISOString().slice(0, 19).replace('T', ' ');
-              }
-              return val;
-            });
-            if (to === 'sqlite') {
-              await sqliteDb.run(sql, values);
-            } else {
-              await mysqlPool.execute(sql, values);
-            }
-          }
-        }
-      }
-
-      res.json({ success: true, message: 'Migração concluída com sucesso!' });
-    } catch (err: any) {
-      console.error('Migration error:', err);
-      res.status(500).json({ error: 'Erro ao migrar dados: ' + err.message });
     }
   });
 

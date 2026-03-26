@@ -168,12 +168,23 @@ export function Dashboard() {
         <div className="space-y-4">
           <div className="flex justify-between items-center no-print">
             <h2 className="text-xl font-semibold text-slate-800">Resultados da Consulta</h2>
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm flex items-center gap-2"
-            >
-              Imprimir Resultados
-            </button>
+            <div className="flex gap-2">
+              {results.length > 0 && (
+                <button
+                  onClick={handleCopyAllText}
+                  className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors font-medium text-sm flex items-center gap-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  Gerar Texto (Todos)
+                </button>
+              )}
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm flex items-center gap-2"
+              >
+                Imprimir Resultados
+              </button>
+            </div>
           </div>
           
           {errors.length > 0 && (
@@ -236,6 +247,12 @@ export function Dashboard() {
                             <p className="text-slate-500">Qtd. Ordens</p>
                             <p className="font-medium text-slate-900">{d.qtdOrdens}</p>
                           </div>
+                          {d.dados_usuario?.hash && (
+                            <div className="col-span-1 md:col-span-2">
+                              <p className="text-slate-500">Hash</p>
+                              <p className="font-medium text-slate-900 break-all">{d.dados_usuario.hash}</p>
+                            </div>
+                          )}
                           {isIndisponivel && d.protocolos && d.protocolos.length > 0 && (
                             <div className="col-span-1 md:col-span-2">
                               <p className="text-slate-500 mb-1">Protocolos</p>
@@ -263,18 +280,6 @@ export function Dashboard() {
                   </div>
                 );
               })}
-            </div>
-          )}
-
-          {results.length > 1 && (
-            <div className="pt-4 flex justify-end">
-              <button
-                onClick={handleCopyAllText}
-                className="flex items-center gap-2 bg-slate-800 text-white py-2 px-6 rounded-lg font-medium hover:bg-slate-900 transition-colors"
-              >
-                <Copy className="w-4 h-4" />
-                Gerar Texto de Todos
-              </button>
             </div>
           )}
         </div>

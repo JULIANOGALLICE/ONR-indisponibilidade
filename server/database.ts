@@ -84,6 +84,7 @@ export async function initDb() {
       status TEXT,
       days INTEGER,
       amount REAL,
+      payment_method TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -153,6 +154,10 @@ export async function initDb() {
 
   try {
     await db.exec('ALTER TABLE groups ADD COLUMN expiration_date DATETIME');
+  } catch (e) {}
+
+  try {
+    await db.exec('ALTER TABLE payments ADD COLUMN payment_method TEXT');
   } catch (e) {}
 
   // Create default group if none exists

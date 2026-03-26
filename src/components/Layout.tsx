@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, Users, Settings, Search, KeyRound, History, Building, CreditCard, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { LogOut, Users, Settings, Search, KeyRound, History, Building, CreditCard, ShieldAlert, AlertTriangle, DollarSign } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
@@ -31,6 +31,7 @@ export function Layout() {
     { path: '/users', label: 'Usuários', icon: Users, roles: ['admin'] },
     { path: '/groups', label: 'Assinantes', icon: Building, roles: ['superadmin'] },
     { path: '/system-settings', label: 'Config. Sistema', icon: ShieldAlert, roles: ['superadmin'] },
+    { path: '/payments', label: 'Pagamentos', icon: DollarSign, roles: ['superadmin'] },
     { path: '/billing', label: 'Assinatura', icon: CreditCard, roles: ['superadmin', 'admin'] },
     { path: '/change-password', label: 'Alterar Senha', icon: KeyRound, roles: ['superadmin', 'admin', 'user'] },
   ];

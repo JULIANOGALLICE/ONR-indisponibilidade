@@ -20,6 +20,7 @@ import { History } from './pages/History';
 import { Groups } from './pages/Groups';
 import { SystemSettings } from './pages/SystemSettings';
 import { Billing } from './pages/Billing';
+import { Payments } from './pages/Payments';
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
               <Route element={<ProtectedRoute allowedRoles={['superadmin']} />}>
                 <Route path="/groups" element={<Groups />} />
                 <Route path="/system-settings" element={<SystemSettings />} />
+                <Route path="/payments" element={<Payments />} />
               </Route>
             </Route>
           </Route>

@@ -236,6 +236,29 @@ async function startServer() {
   });
 
   // User Management Routes (SuperAdmin/Admin)
+  app.get('/api/payments', authenticateToken, authorizeRole(['superadmin']), async (req: any, res) => {
+    try {
+      const payments = await db.all(`
+        SELECT 
+          p.id, 
+          p.amount, 
+          p.status, 
+          p.days, 
+          p.payment_method, 
+          p.updated_at, 
+          g.name as group_name
+        FROM payments p
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE p.status = 'approved'
+        ORDER BY p.updated_at DESC
+      `);
+      res.json(payments);
+    } catch (err) {
+      console.error('Error fetching payments:', err);
+      res.status(500).json({ error: 'Erro ao buscar pagamentos.' });
+    }
+  });
+
   app.get('/api/users', authenticateToken, authorizeRole(['superadmin', 'admin']), async (req: any, res) => {
     try {
       let users;
@@ -540,6 +563,7 @@ async function startServer() {
       const paymentData = mpRes.data;
       const status = paymentData.status;
       const paymentExternalRef = paymentData.external_reference;
+      const paymentMethod = paymentData.payment_method_id || 'N/A';
 
       if (paymentExternalRef !== external_reference) {
         return res.status(400).json({ error: 'Referência externa não confere.' });
@@ -555,8 +579,8 @@ async function startServer() {
 
       // Update payment record
       const updateRes = await db.run(
-        'UPDATE payments SET status = ?, mp_payment_id = ?, updated_at = CURRENT_TIMESTAMP WHERE external_reference = ? AND status = "pending"',
-        [status, payment_id, external_reference]
+        'UPDATE payments SET status = ?, mp_payment_id = ?, payment_method = ?, updated_at = CURRENT_TIMESTAMP WHERE external_reference = ? AND status = "pending"',
+        [status, payment_id, paymentMethod, external_reference]
       );
 
       if (status === 'approved' && updateRes.changes && updateRes.changes > 0) {
@@ -614,6 +638,7 @@ async function startServer() {
         const paymentData = mpRes.data;
         const external_reference = paymentData.external_reference;
         const status = paymentData.status;
+        const paymentMethod = paymentData.payment_method_id || 'N/A';
 
         if (!external_reference) return;
 
@@ -623,8 +648,8 @@ async function startServer() {
 
         // Update payment record
         const updateRes = await db.run(
-          'UPDATE payments SET status = ?, mp_payment_id = ?, updated_at = CURRENT_TIMESTAMP WHERE external_reference = ? AND status = "pending"',
-          [status, paymentId, external_reference]
+          'UPDATE payments SET status = ?, mp_payment_id = ?, payment_method = ?, updated_at = CURRENT_TIMESTAMP WHERE external_reference = ? AND status = "pending"',
+          [status, paymentId, paymentMethod, external_reference]
         );
 
         if (status === 'approved' && updateRes.changes && updateRes.changes > 0) {

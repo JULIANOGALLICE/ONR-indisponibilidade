@@ -499,7 +499,6 @@ async function startServer() {
       }
 
       console.log('Sending preference to MP:', JSON.stringify(preferenceData, null, 2));
-      require('fs').writeFileSync('mp_debug.json', JSON.stringify(preferenceData, null, 2));
 
       const mpRes = await axios.post('https://api.mercadopago.com/checkout/preferences', preferenceData, {
         headers: {

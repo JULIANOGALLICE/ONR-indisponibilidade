@@ -489,7 +489,7 @@ async function startServer() {
       
       appUrl = appUrl.replace(/\/$/, '');
       
-      const preferenceData = {
+      const preferenceData: any = {
         items: [
           {
             title: `Licença de ${days} dias - Sistema ONR`,
@@ -504,15 +504,18 @@ async function startServer() {
           pending: `${appUrl}/billing?status=pending`
         },
         auto_return: 'approved',
-        external_reference: external_reference,
-        notification_url: `${appUrl}/api/webhooks/mercadopago`
+        external_reference: external_reference
       };
+
+      if (appUrl.startsWith('https://')) {
+        preferenceData.notification_url = `${appUrl}/api/webhooks/mercadopago`;
+      }
 
       console.log('Sending preference to MP:', JSON.stringify(preferenceData, null, 2));
 
       const mpRes = await axios.post('https://api.mercadopago.com/checkout/preferences', preferenceData, {
         headers: {
-          'Authorization': `Bearer ${settings.mp_access_token}`,
+          'Authorization': `Bearer ${settings.mp_access_token.trim()}`,
           'Content-Type': 'application/json'
         }
       });
@@ -525,7 +528,8 @@ async function startServer() {
       res.json({ init_point: mpRes.data.init_point, preference_id: mpRes.data.id });
     } catch (err: any) {
       console.error('Erro ao criar preferência MP:', err.response?.data || err.message);
-      res.status(500).json({ error: 'Erro ao gerar pagamento.' });
+      const mpError = err.response?.data?.message || err.response?.data?.error || err.message;
+      res.status(500).json({ error: `Erro do Mercado Pago: ${mpError}` });
     }
   });
 

@@ -681,7 +681,7 @@ async function startServer() {
   app.get('/api/history', authenticateToken, async (req: any, res) => {
     try {
       const search = req.query.search ? `%${req.query.search}%` : null;
-      let query = 'SELECT history.* FROM history JOIN users ON history.user_id = users.id WHERE ';
+      let query = 'SELECT history.*, users.name as user_name, users.email as user_email FROM history JOIN users ON history.user_id = users.id WHERE ';
       const params: any[] = [];
 
       if (req.user.role === 'admin') {

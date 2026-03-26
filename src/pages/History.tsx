@@ -137,9 +137,14 @@ export function History() {
                     </td>
                     <td className="p-4 text-sm text-gray-600">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-900">{item.nome || '-'}</span>
-                        <span className="text-xs text-gray-500">{item.documento_usuario}</span>
-                        {item.user_email && <span className="text-xs text-indigo-600">{item.user_email}</span>}
+                        <span className="font-medium text-gray-900">{item.user_name || item.user_email || '-'}</span>
+                        {item.user_email && item.user_name && <span className="text-xs text-indigo-600">{item.user_email}</span>}
+                        {(item.nome || item.documento_usuario) && (
+                          <div className="mt-1 pt-1 border-t border-gray-100 flex flex-col">
+                            <span className="text-xs text-gray-500">ONR: {item.nome}</span>
+                            <span className="text-xs text-gray-400">{item.documento_usuario}</span>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-4 text-sm text-gray-600">

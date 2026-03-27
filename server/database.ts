@@ -186,6 +186,8 @@ export async function initSqlite() {
     driver: sqlite3.Database
   });
 
+  await db.exec('PRAGMA journal_mode = WAL;');
+
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -33,6 +33,10 @@ class MySQLWrapper {
   async exec(sql: string) {
     await this.pool.query(sql);
   }
+
+  async close() {
+    await this.pool.end();
+  }
 }
 
 export async function initDb() {
@@ -52,7 +56,7 @@ export async function initDb() {
   }
 }
 
-async function initMysql() {
+export async function initMysql() {
   const pool = mysql.createPool({
     host: 'localhost',
     user: 'usuario',
@@ -176,7 +180,7 @@ async function initMysql() {
   return db;
 }
 
-async function initSqlite() {
+export async function initSqlite() {
   const db = await open({
     filename: './database.sqlite',
     driver: sqlite3.Database

@@ -1,54 +1,8 @@
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
-import mysql from 'mysql2/promise';
-
-class MySQLWrapper {
-  pool: mysql.Pool;
-
-  constructor(pool: mysql.Pool) {
-    this.pool = pool;
-  }
-
-  async get(sql: string, params: any[] = []) {
-    const [rows] = await this.pool.execute(sql, params);
-    return (rows as any[])[0];
-  }
-
-  async all(sql: string, params: any[] = []): Promise<any[]> {
-    const [rows] = await this.pool.execute(sql, params);
-    return rows as any[];
-  }
-
-  async run(sql: string, params: any[] = []) {
-    const [result] = await this.pool.execute(sql, params);
-    return {
-      lastID: (result as any).insertId,
-      changes: (result as any).affectedRows
-    };
-  }
-
-  async exec(sql: string) {
-    await this.pool.query(sql);
-  }
-}
+import { initMysql, initSqlite } from './database';
 
 export async function migrateData(from: string, to: string) {
-  const sqliteDb = await open({
-    filename: './database.sqlite',
-    driver: sqlite3.Database
-  });
-
-  const mysqlPool = mysql.createPool({
-    host: 'localhost',
-    user: 'usuario',
-    password: '@Cartorio18441@@',
-    database: 'bdIndisponibilidade',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    multipleStatements: true
-  });
-  const mysqlDb = new MySQLWrapper(mysqlPool);
+  const sqliteDb = await initSqlite();
+  const mysqlDb = await initMysql();
 
   const sourceDb = from === 'sqlite' ? sqliteDb : mysqlDb;
   const targetDb = to === 'sqlite' ? sqliteDb : mysqlDb;
@@ -71,15 +25,11 @@ export async function migrateData(from: string, to: string) {
 
       for (const row of rows) {
         const values = columns.map(col => row[col]);
-        if (to === 'sqlite') {
-          await (targetDb as any).run(sql, values);
-        } else {
-          await (targetDb as any).run(sql, values);
-        }
+        await (targetDb as any).run(sql, values);
       }
     }
   }
 
-  await mysqlPool.end();
+  await (mysqlDb as any).close();
   await sqliteDb.close();
 }

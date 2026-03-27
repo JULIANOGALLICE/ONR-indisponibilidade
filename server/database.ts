@@ -92,7 +92,7 @@ export async function initMysql() {
       cpf_usuario TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS groups (
+    CREATE TABLE IF NOT EXISTS \`groups\` (
       id INT AUTO_INCREMENT PRIMARY KEY,
       name TEXT NOT NULL,
       client_id TEXT,
@@ -156,9 +156,9 @@ export async function initMysql() {
     );
   `);
 
-  const defaultGroup = await db.get('SELECT * FROM groups WHERE id = 1');
+  const defaultGroup = await db.get('SELECT * FROM \`groups\` WHERE id = 1');
   if (!defaultGroup) {
-    await db.run('INSERT INTO groups (id, name, environment) VALUES (1, "Grupo Padrão", "stg")');
+    await db.run('INSERT INTO \`groups\` (id, name, environment) VALUES (1, "Grupo Padrão", "stg")');
   }
 
   await db.run('UPDATE users SET group_id = 1 WHERE group_id IS NULL');
@@ -209,7 +209,7 @@ export async function initSqlite() {
       cpf_usuario TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS groups (
+    CREATE TABLE IF NOT EXISTS \`groups\` (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       client_id TEXT,
@@ -319,21 +319,21 @@ export async function initSqlite() {
   } catch (e) {}
 
   try {
-    await db.exec('ALTER TABLE users ADD COLUMN group_id INTEGER REFERENCES groups(id)');
+    await db.exec('ALTER TABLE users ADD COLUMN group_id INTEGER REFERENCES \`groups\`(id)');
   } catch (e) {
     // Column might already exist
   }
 
   try {
-    await db.exec('ALTER TABLE groups ADD COLUMN template_positive TEXT');
+    await db.exec('ALTER TABLE \`groups\` ADD COLUMN template_positive TEXT');
   } catch (e) {}
 
   try {
-    await db.exec('ALTER TABLE groups ADD COLUMN template_negative TEXT');
+    await db.exec('ALTER TABLE \`groups\` ADD COLUMN template_negative TEXT');
   } catch (e) {}
 
   try {
-    await db.exec('ALTER TABLE groups ADD COLUMN expiration_date DATETIME');
+    await db.exec('ALTER TABLE \`groups\` ADD COLUMN expiration_date DATETIME');
   } catch (e) {}
 
   try {
@@ -341,15 +341,15 @@ export async function initSqlite() {
   } catch (e) {}
 
   // Create default group if none exists
-  const defaultGroup = await db.get('SELECT * FROM groups WHERE id = 1');
+  const defaultGroup = await db.get('SELECT * FROM \`groups\` WHERE id = 1');
   if (!defaultGroup) {
-    await db.run('INSERT INTO groups (id, name, environment) VALUES (1, "Grupo Padrão", "stg")');
+    await db.run('INSERT INTO \`groups\` (id, name, environment) VALUES (1, "Grupo Padrão", "stg")');
     // Migrate config if exists
     try {
       const config = await db.get('SELECT * FROM config LIMIT 1');
       if (config) {
         await db.run(
-          'UPDATE groups SET client_id = ?, client_secret = ?, environment = ?, cpf_usuario = ? WHERE id = 1',
+          'UPDATE \`groups\` SET client_id = ?, client_secret = ?, environment = ?, cpf_usuario = ? WHERE id = 1',
           [config.client_id, config.client_secret, config.environment, config.cpf_usuario]
         );
       }

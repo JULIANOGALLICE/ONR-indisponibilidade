@@ -63,7 +63,7 @@ async function startServer() {
     if (token == null) return res.sendStatus(401);
 
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-      if (err) return res.sendStatus(403);
+      if (err) return res.status(401).json({ error: 'Token inválido ou expirado.' });
       req.user = user;
       next();
     });
@@ -90,7 +90,7 @@ async function startServer() {
       const confirmationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
 
       // Create a new group for this client
-      const groupResult = await db.run('INSERT INTO groups (name) VALUES (?)', [`Grupo de ${name}`]);
+      const groupResult = await db.run('INSERT INTO `groups` (name) VALUES (?)', [`Grupo de ${name}`]);
       const groupId = groupResult.lastID;
 
       await db.run(
@@ -143,7 +143,7 @@ async function startServer() {
 
       await db.run('UPDATE users SET is_confirmed = 1, confirmation_token = NULL WHERE id = ?', [user.id]);
       if (expirationDate) {
-        await db.run('UPDATE groups SET expiration_date = ? WHERE id = ?', [expirationDate, user.group_id]);
+        await db.run('UPDATE `groups` SET expiration_date = ? WHERE id = ?', [expirationDate, user.group_id]);
       }
 
       res.json({ message: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
@@ -249,7 +249,7 @@ async function startServer() {
           p.updated_at, 
           g.name as group_name
         FROM payments p
-        LEFT JOIN groups g ON p.group_id = g.id
+        LEFT JOIN \`groups\` g ON p.group_id = g.id
         WHERE p.status = 'approved'
         ORDER BY p.updated_at DESC
       `);
@@ -264,7 +264,7 @@ async function startServer() {
     try {
       let users;
       if (req.user.role === 'superadmin') {
-        users = await db.all('SELECT users.id, users.email, users.role, users.created_at, users.group_id, groups.name as group_name FROM users LEFT JOIN groups ON users.group_id = groups.id');
+        users = await db.all('SELECT users.id, users.email, users.role, users.created_at, users.group_id, `groups`.name as group_name FROM users LEFT JOIN `groups` ON users.group_id = `groups`.id');
       } else {
         users = await db.all('SELECT id, email, role, created_at, group_id FROM users WHERE role = "user" AND group_id = ?', [req.user.group_id]);
       }
@@ -318,16 +318,16 @@ async function startServer() {
   // Config Routes (Admin/SuperAdmin)
   app.get('/api/config', authenticateToken, authorizeRole(['superadmin', 'admin']), async (req: any, res) => {
     try {
-      const config = await db.get('SELECT client_id, client_secret, environment, cpf_usuario, template_positive, template_negative FROM groups WHERE id = ?', [req.user.group_id]);
+      const config = await db.get('SELECT client_id, client_secret, environment, cpf_usuario, template_positive, template_negative FROM `groups` WHERE id = ?', [req.user.group_id]);
       res.json(config || {});
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
     }
   });
 
-  app.get('/api/config/templates', authenticateToken, async (req: any, res) => {
+  app.get('/api/templates', authenticateToken, async (req: any, res) => {
     try {
-      const config = await db.get('SELECT template_positive, template_negative, expiration_date FROM groups WHERE id = ?', [req.user.group_id]);
+      const config = await db.get('SELECT template_positive, template_negative, expiration_date FROM `groups` WHERE id = ?', [req.user.group_id]);
       res.json(config || {});
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
@@ -338,7 +338,7 @@ async function startServer() {
     const { client_id, client_secret, environment, cpf_usuario, template_positive, template_negative } = req.body;
     try {
       await db.run(
-        'UPDATE groups SET client_id = ?, client_secret = ?, environment = ?, cpf_usuario = ?, template_positive = ?, template_negative = ? WHERE id = ?',
+        'UPDATE `groups` SET client_id = ?, client_secret = ?, environment = ?, cpf_usuario = ?, template_positive = ?, template_negative = ? WHERE id = ?',
         [client_id, client_secret, environment, cpf_usuario, template_positive, template_negative, req.user.group_id]
       );
       res.json({ message: 'Configurações atualizadas com sucesso.' });
@@ -353,7 +353,7 @@ async function startServer() {
       const groups = await db.all(`
         SELECT g.id, g.name, g.environment, g.created_at, g.expiration_date,
         (SELECT email FROM users WHERE group_id = g.id AND role = 'admin' LIMIT 1) as admin_email
-        FROM groups g
+        FROM \`groups\` g
       `);
       res.json(groups);
     } catch (err) {
@@ -364,7 +364,7 @@ async function startServer() {
   app.post('/api/groups', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
     const { name } = req.body;
     try {
-      await db.run('INSERT INTO groups (name) VALUES (?)', [name]);
+      await db.run('INSERT INTO `groups` (name) VALUES (?)', [name]);
       res.json({ message: 'Grupo criado com sucesso.' });
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
@@ -374,7 +374,7 @@ async function startServer() {
   app.put('/api/groups/:id/expiration', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
     const { expiration_date } = req.body;
     try {
-      await db.run('UPDATE groups SET expiration_date = ? WHERE id = ?', [expiration_date, req.params.id]);
+      await db.run('UPDATE `groups` SET expiration_date = ? WHERE id = ?', [expiration_date, req.params.id]);
       res.json({ message: 'Data de expiração atualizada com sucesso.' });
     } catch (err) {
       res.status(500).json({ error: 'Erro no servidor.' });
@@ -504,7 +504,7 @@ async function startServer() {
   app.get('/api/billing/plans', authenticateToken, async (req: any, res) => {
     try {
       const settings = await db.get('SELECT mp_public_key, price_30, price_90, price_180, price_365 FROM system_settings LIMIT 1');
-      const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [req.user.group_id]);
+      const group = await db.get('SELECT expiration_date FROM `groups` WHERE id = ?', [req.user.group_id]);
       res.json({
         plans: {
           30: settings?.price_30 || 0,
@@ -631,7 +631,7 @@ async function startServer() {
 
       if (status === 'approved' && updateRes.changes && updateRes.changes > 0) {
         // Add days to group's expiration_date
-        const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [groupId]);
+        const group = await db.get('SELECT expiration_date FROM `groups` WHERE id = ?', [groupId]);
         let newExpiration = new Date();
         
         if (group && group.expiration_date) {
@@ -644,7 +644,7 @@ async function startServer() {
         newExpiration.setDate(newExpiration.getDate() + days);
         
         await db.run(
-          'UPDATE groups SET expiration_date = ? WHERE id = ?',
+          'UPDATE `groups` SET expiration_date = ? WHERE id = ?',
           [newExpiration.toISOString(), groupId]
         );
         
@@ -652,7 +652,7 @@ async function startServer() {
       }
 
       // If already processed or not approved
-      const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [groupId]);
+      const group = await db.get('SELECT expiration_date FROM `groups` WHERE id = ?', [groupId]);
       res.json({ status, expiration_date: group?.expiration_date });
     } catch (err) {
       console.error('Verify payment error:', err);
@@ -700,7 +700,7 @@ async function startServer() {
 
         if (status === 'approved' && updateRes.changes && updateRes.changes > 0) {
           // Add days to group's expiration_date
-          const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [groupId]);
+          const group = await db.get('SELECT expiration_date FROM `groups` WHERE id = ?', [groupId]);
           let newExpiration = new Date();
           
           if (group && group.expiration_date) {
@@ -713,7 +713,7 @@ async function startServer() {
           newExpiration.setDate(newExpiration.getDate() + days);
           
           await db.run(
-            'UPDATE groups SET expiration_date = ? WHERE id = ?',
+            'UPDATE `groups` SET expiration_date = ? WHERE id = ?',
             [newExpiration.toISOString(), groupId]
           );
         }
@@ -756,7 +756,7 @@ async function startServer() {
 
   // ONR API Proxy Routes (Normal Users)
   const getOnrToken = async (groupId: number) => {
-    const config = await db.get('SELECT * FROM groups WHERE id = ?', [groupId]);
+    const config = await db.get('SELECT * FROM `groups` WHERE id = ?', [groupId]);
     if (!config || !config.client_id || !config.client_secret) {
       throw new Error('Configurações do ONR não definidas para este grupo.');
     }
@@ -790,7 +790,7 @@ async function startServer() {
   app.post('/api/onr/consultar', authenticateToken, async (req: any, res) => {
     try {
       // Check expiration
-      const group = await db.get('SELECT expiration_date FROM groups WHERE id = ?', [req.user.group_id]);
+      const group = await db.get('SELECT expiration_date FROM `groups` WHERE id = ?', [req.user.group_id]);
       if (req.user.role !== 'superadmin' && group && group.expiration_date) {
         const expDate = new Date(group.expiration_date);
         if (expDate < new Date()) {
@@ -911,8 +911,17 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (e: any) => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Please kill the process using this port and restart the server.`);
+      process.exit(1);
+    } else {
+      console.error('Server error:', e);
+    }
   });
 }
 

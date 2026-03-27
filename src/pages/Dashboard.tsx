@@ -19,7 +19,7 @@ export function Dashboard() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await axios.get('/api/config/templates');
+      const res = await axios.get('/api/templates');
       if (res.data) {
         setTemplates({
           template_positive: res.data.template_positive || '',
@@ -27,8 +27,10 @@ export function Dashboard() {
         });
         setExpirationDate(res.data.expiration_date);
       }
-    } catch (err) {
-      console.error('Erro ao carregar modelos de texto', err);
+    } catch (err: any) {
+      if (err.response?.status !== 401) {
+        console.error('Erro ao carregar modelos de texto', err);
+      }
     }
   };
 

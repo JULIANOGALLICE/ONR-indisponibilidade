@@ -7,7 +7,7 @@ export async function migrateData(from: string, to: string) {
   const sourceDb = from === 'sqlite' ? sqliteDb : mysqlDb;
   const targetDb = to === 'sqlite' ? sqliteDb : mysqlDb;
 
-  const tables = ['users', 'config', 'groups', 'history', 'system_settings', 'payments'];
+  const tables = ['users', 'config', '\`groups\`', 'history', 'system_settings', 'payments'];
 
   for (const table of tables) {
     // Clear target table

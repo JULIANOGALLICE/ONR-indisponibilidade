@@ -22,6 +22,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const logout = React.useCallback(() => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    delete axios.defaults.headers.common['Authorization'];
+  }, []);
+
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
@@ -32,7 +40,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
     }
     setIsLoading(false);
-  }, []);
+
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          logout();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, [logout]);
 
   const login = (newToken: string, newUser: User) => {
     setToken(newToken);
@@ -40,14 +62,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(newUser));
     axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
   };
 
   return (

@@ -6,6 +6,7 @@ import { initDb } from './server/database.ts';
 import path from 'path';
 import axios from 'axios';
 import nodemailer from 'nodemailer';
+import fs from 'fs';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
 
@@ -451,6 +452,51 @@ async function startServer() {
     } catch (err: any) {
       console.error('Erro ao enviar e-mail de teste:', err);
       res.status(500).json({ error: `Falha ao enviar: ${err.message}` });
+    }
+  });
+
+  // Database Config Routes (SuperAdmin)
+  app.get('/api/db-config', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
+    try {
+      const configPath = path.join(process.cwd(), 'server', 'db-config.json');
+      let dbType = 'sqlite';
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        if (config.type === 'mysql') dbType = 'mysql';
+      }
+      res.json({ type: dbType });
+    } catch (err) {
+      res.status(500).json({ error: 'Erro ao ler configuração do banco de dados.' });
+    }
+  });
+
+  app.post('/api/db-config', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
+    const { type } = req.body;
+    if (type !== 'sqlite' && type !== 'mysql') {
+      return res.status(400).json({ error: 'Tipo de banco de dados inválido.' });
+    }
+    try {
+      const configPath = path.join(process.cwd(), 'server', 'db-config.json');
+      fs.writeFileSync(configPath, JSON.stringify({ type }, null, 2));
+      res.json({ message: 'Configuração atualizada. Reinicie o servidor para aplicar.' });
+    } catch (err) {
+      res.status(500).json({ error: 'Erro ao salvar configuração do banco de dados.' });
+    }
+  });
+
+  app.post('/api/db-migrate', authenticateToken, authorizeRole(['superadmin']), async (req, res) => {
+    const { from, to } = req.body;
+    if ((from !== 'sqlite' && from !== 'mysql') || (to !== 'sqlite' && to !== 'mysql') || from === to) {
+      return res.status(400).json({ error: 'Parâmetros de migração inválidos.' });
+    }
+
+    try {
+      const { migrateData } = await import('./server/migrate.ts');
+      await migrateData(from, to);
+      res.json({ message: 'Migração concluída com sucesso.' });
+    } catch (err: any) {
+      console.error('Migration error:', err);
+      res.status(500).json({ error: `Erro na migração: ${err.message}` });
     }
   });
 

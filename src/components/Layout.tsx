@@ -118,7 +118,7 @@ export function Layout() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-8 max-w-6xl mx-auto">
+        <div className="p-8 max-w-[1600px] mx-auto">
           <Outlet />
         </div>
       </main>

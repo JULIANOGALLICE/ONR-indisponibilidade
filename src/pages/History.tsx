@@ -113,7 +113,7 @@ export function History() {
                   <th className="p-4 text-sm font-semibold text-gray-600">Status</th>
                   <th className="p-4 text-sm font-semibold text-gray-600">Hash</th>
                   <th className="p-4 text-sm font-semibold text-gray-600">Protocolos</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 text-center w-[1%] whitespace-nowrap">Ações</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -131,7 +131,7 @@ export function History() {
                         {item.data || new Date(item.created_at.replace(' ', 'T')).toLocaleString('pt-BR')}
                       </div>
                     </td>
-                    <td className="p-4 text-sm font-medium text-gray-900 break-all">
+                    <td className="p-4 text-sm font-medium text-gray-900">
                       {item.documento}
                     </td>
                     <td className="p-4 text-sm text-gray-600">
@@ -139,8 +139,8 @@ export function History() {
                     </td>
                     <td className="p-4 text-sm text-gray-600">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-900 break-all">{item.user_name || item.user_email || '-'}</span>
-                        {item.user_email && item.user_name && <span className="text-xs text-indigo-600 break-all">{item.user_email}</span>}
+                        <span className="font-medium text-gray-900">{item.user_name || item.user_email || '-'}</span>
+                        {item.user_email && item.user_name && <span className="text-xs text-indigo-600">{item.user_email}</span>}
                         {(item.nome || item.documento_usuario) && (
                           <div className="mt-1 pt-1 border-t border-gray-100 flex flex-col">
                             <span className="text-xs text-gray-500">ONR: {item.nome}</span>
@@ -163,7 +163,7 @@ export function History() {
                         </span>
                       )}
                     </td>
-                    <td className="p-4 text-sm text-gray-600 font-mono text-xs break-all">
+                    <td className="p-4 text-sm text-gray-600 font-mono text-xs">
                       {item.hash || '-'}
                     </td>
                     <td className="p-4 text-sm text-gray-600">
@@ -185,15 +185,13 @@ export function History() {
                       )}
                     </td>
                     <td className="p-4 text-sm text-gray-600">
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => handleCopyText(item, protocolos)}
-                          className="flex items-center justify-center p-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-                          title="Gerar e copiar texto personalizado"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleCopyText(item, protocolos)}
+                        className="flex items-center justify-center p-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                        title="Gerar e copiar texto personalizado"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 )})}

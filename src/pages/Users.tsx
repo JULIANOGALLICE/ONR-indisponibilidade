@@ -139,13 +139,13 @@ export function Users() {
                     <th className="px-6 py-3 font-medium">E-mail</th>
                     <th className="px-6 py-3 font-medium">Nível</th>
                     <th className="px-6 py-3 font-medium">Data de Criação</th>
-                    <th className="px-6 py-3 font-medium text-right w-[1%] whitespace-nowrap">Ações</th>
+                    <th className="px-6 py-3 font-medium text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {users.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 font-medium text-slate-900 break-all">{u.email}</td>
+                      <td className="px-6 py-4 font-medium text-slate-900">{u.email}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                           u.role === 'superadmin' ? 'bg-purple-100 text-purple-700' :

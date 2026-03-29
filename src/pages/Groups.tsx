@@ -72,62 +72,60 @@ export function Groups() {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 text-sm font-semibold text-slate-600">ID</th>
-                <th className="p-4 text-sm font-semibold text-slate-600">Nome</th>
-                <th className="p-4 text-sm font-semibold text-slate-600">Admin (Email)</th>
-                <th className="p-4 text-sm font-semibold text-slate-600">Expiração</th>
-                <th className="p-4 text-sm font-semibold text-slate-600 w-[1%] whitespace-nowrap">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredGroups.map((group) => (
-                <tr key={group.id} className="hover:bg-slate-50">
-                  <td className="p-4 text-sm text-slate-600">{group.id}</td>
-                  <td className="p-4 text-sm font-medium text-slate-900 flex items-center gap-2">
-                    <Building className="w-4 h-4 text-slate-400" />
-                    {group.name}
-                  </td>
-                  <td className="p-4 text-sm text-slate-600 break-all">{group.admin_email || 'Sem admin'}</td>
-                  <td className="p-4 text-sm text-slate-600">
-                    {editingId === group.id ? (
-                      <input
-                        type="date"
-                        value={editDate}
-                        onChange={(e) => setEditDate(e.target.value)}
-                        className="px-2 py-1 border border-slate-300 rounded text-sm"
-                      />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-slate-400" />
-                        {group.expiration_date ? new Date(group.expiration_date.replace(' ', 'T')).toLocaleDateString('pt-BR') : 'Ilimitado'}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-4 text-sm">
-                    {editingId === group.id ? (
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handleSave(group.id)} className="text-emerald-600 hover:text-emerald-700">
-                          <Check className="w-5 h-5" />
-                        </button>
-                        <button onClick={() => setEditingId(null)} className="text-red-600 hover:text-red-700">
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => handleEdit(group)} className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                        <Edit2 className="w-4 h-4" /> Editar
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="p-4 text-sm font-semibold text-slate-600">ID</th>
+              <th className="p-4 text-sm font-semibold text-slate-600">Nome</th>
+              <th className="p-4 text-sm font-semibold text-slate-600">Admin (Email)</th>
+              <th className="p-4 text-sm font-semibold text-slate-600">Expiração</th>
+              <th className="p-4 text-sm font-semibold text-slate-600">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filteredGroups.map((group) => (
+              <tr key={group.id} className="hover:bg-slate-50">
+                <td className="p-4 text-sm text-slate-600">{group.id}</td>
+                <td className="p-4 text-sm font-medium text-slate-900 flex items-center gap-2">
+                  <Building className="w-4 h-4 text-slate-400" />
+                  {group.name}
+                </td>
+                <td className="p-4 text-sm text-slate-600">{group.admin_email || 'Sem admin'}</td>
+                <td className="p-4 text-sm text-slate-600">
+                  {editingId === group.id ? (
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="px-2 py-1 border border-slate-300 rounded text-sm"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-slate-400" />
+                      {group.expiration_date ? new Date(group.expiration_date.replace(' ', 'T')).toLocaleDateString('pt-BR') : 'Ilimitado'}
+                    </div>
+                  )}
+                </td>
+                <td className="p-4 text-sm">
+                  {editingId === group.id ? (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleSave(group.id)} className="text-emerald-600 hover:text-emerald-700">
+                        <Check className="w-5 h-5" />
                       </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      <button onClick={() => setEditingId(null)} className="text-red-600 hover:text-red-700">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => handleEdit(group)} className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                      <Edit2 className="w-4 h-4" /> Editar
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

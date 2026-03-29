@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { CreditCard, Calendar, User, DollarSign, Package } from 'lucide-react';
+import { parseDate } from '../utils/date';
 
 export function Payments() {
   const [payments, setPayments] = useState<any[]>([]);
@@ -29,8 +30,9 @@ export function Payments() {
     }).format(value);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString.replace(' ', 'T')).toLocaleString('pt-BR');
+  const formatDate = (dateString: string | number | null) => {
+    if (!dateString) return '-';
+    return parseDate(dateString)?.toLocaleString('pt-BR') || '-';
   };
 
   const getPaymentMethodName = (method: string) => {

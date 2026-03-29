@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { CreditCard, Calendar, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import { parseDate } from '../utils/date';
 
 export function Billing() {
   const [plans, setPlans] = useState<any>({});
@@ -68,7 +69,7 @@ export function Billing() {
 
   if (loading) return <div className="p-8 text-center text-slate-500">Carregando planos...</div>;
 
-  const isExpired = expirationDate && new Date(expirationDate.replace(' ', 'T')) < new Date();
+  const isExpired = expirationDate && (parseDate(expirationDate) || new Date()) < new Date();
   const hasUnlimited = !expirationDate;
 
   return (
@@ -131,7 +132,7 @@ export function Billing() {
             ) : (
               <>
                 Válido até: <strong className={isExpired ? 'text-red-600' : 'text-emerald-600'}>
-                  {new Date(expirationDate.replace(' ', 'T')).toLocaleDateString('pt-BR')}
+                  {parseDate(expirationDate)?.toLocaleDateString('pt-BR')}
                 </strong>
                 {isExpired && <span className="ml-2 text-red-600 text-sm font-medium">(Expirado)</span>}
               </>

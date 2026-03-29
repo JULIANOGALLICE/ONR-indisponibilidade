@@ -26,7 +26,13 @@ export async function migrateData(from: string, to: string) {
       for (const row of rows) {
         const values = columns.map(col => {
           let val = row[col];
-          // Fix datetime format for MySQL
+          
+          // If the value is a Date object (e.g. from MySQL), convert it to string
+          if (val instanceof Date) {
+            val = val.toISOString().slice(0, 19).replace('T', ' ');
+          }
+          
+          // Fix datetime format for MySQL if it's a string from SQLite
           if (to === 'mysql' && typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
             val = val.replace('T', ' ').replace('Z', '').split('.')[0];
           }

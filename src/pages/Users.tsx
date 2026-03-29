@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Trash2, UserPlus, Shield, User } from 'lucide-react';
+import { parseDate } from '../utils/date';
 
 export function Users() {
   const { user } = useAuth();
@@ -157,7 +158,7 @@ export function Users() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {new Date(u.created_at.replace(' ', 'T')).toLocaleDateString('pt-BR')}
+                        {u.created_at ? parseDate(u.created_at)?.toLocaleDateString('pt-BR') : '-'}
                       </td>
                       <td className="px-6 py-4 text-right">
                         {u.role !== 'superadmin' && u.id !== user?.id && (

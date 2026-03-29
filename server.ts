@@ -668,7 +668,7 @@ async function startServer() {
         let newExpiration = new Date();
         
         if (group && group.expiration_date) {
-          const currentExpiration = new Date(group.expiration_date.replace(' ', 'T'));
+          const currentExpiration = new Date(typeof group.expiration_date === 'string' ? group.expiration_date.replace(' ', 'T') : group.expiration_date);
           if (currentExpiration > newExpiration) {
             newExpiration = currentExpiration;
           }
@@ -737,7 +737,7 @@ async function startServer() {
           let newExpiration = new Date();
           
           if (group && group.expiration_date) {
-            const currentExpiration = new Date(group.expiration_date.replace(' ', 'T'));
+            const currentExpiration = new Date(typeof group.expiration_date === 'string' ? group.expiration_date.replace(' ', 'T') : group.expiration_date);
             if (currentExpiration > newExpiration) {
               newExpiration = currentExpiration;
             }
@@ -825,7 +825,7 @@ async function startServer() {
       // Check expiration
       const group = await db.get('SELECT expiration_date FROM `groups` WHERE id = ?', [req.user.group_id]);
       if (req.user.role !== 'superadmin' && group && group.expiration_date) {
-        const expDate = new Date(group.expiration_date.replace(' ', 'T'));
+        const expDate = new Date(typeof group.expiration_date === 'string' ? group.expiration_date.replace(' ', 'T') : group.expiration_date);
         if (expDate < new Date()) {
           return res.status(403).json({ error: 'Sua licença expirou. Por favor, renove sua assinatura para continuar utilizando o sistema.' });
         }

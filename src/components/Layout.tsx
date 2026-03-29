@@ -1,5 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { parseDate } from '../utils/date';
 import { LogOut, Users, Settings, Search, KeyRound, History, Building, CreditCard, ShieldAlert, AlertTriangle, DollarSign, Database } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useState, useEffect } from 'react';
@@ -39,7 +40,8 @@ export function Layout() {
 
   const calculateRemainingDays = () => {
     if (!expirationDate) return null;
-    const expDate = new Date(expirationDate.replace(' ', 'T'));
+    const expDate = parseDate(expirationDate);
+    if (!expDate) return null;
     const today = new Date();
     const diffTime = expDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

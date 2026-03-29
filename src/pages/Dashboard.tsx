@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Search, AlertCircle, CheckCircle, Copy } from 'lucide-react';
 import { generateCustomText } from '../utils/template';
 import { useAuth } from '../contexts/AuthContext';
+import { parseDate } from '../utils/date';
 
 export function Dashboard() {
   const [documentos, setDocumentos] = useState('');
@@ -119,7 +120,7 @@ export function Dashboard() {
     setLoading(false);
   };
 
-  const isExpired = user?.role !== 'superadmin' && expirationDate && new Date(expirationDate.replace(' ', 'T')) < new Date();
+  const isExpired = user?.role !== 'superadmin' && expirationDate && (parseDate(expirationDate) || new Date()) < new Date();
 
   return (
     <div className="space-y-6">

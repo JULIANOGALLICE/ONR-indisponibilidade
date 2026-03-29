@@ -105,15 +105,15 @@ export function History() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="p-4 text-sm font-semibold text-gray-600">Data</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Documento Consultado</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Nome/Razão</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Usuário</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Qtd. Ordens</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Status</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Hash</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Protocolos</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Ações</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Data</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Documento Consultado</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Nome/Razão</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Usuário</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Qtd. Ordens</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Status</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Hash</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Protocolos</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap text-center">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -185,13 +185,15 @@ export function History() {
                       )}
                     </td>
                     <td className="p-4 text-sm text-gray-600">
-                      <button
-                        onClick={() => handleCopyText(item, protocolos)}
-                        className="flex items-center justify-center p-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-                        title="Gerar e copiar texto personalizado"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
+                      <div className="flex justify-center">
+                        <button
+                          onClick={() => handleCopyText(item, protocolos)}
+                          className="flex items-center justify-center p-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                          title="Gerar e copiar texto personalizado"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )})}

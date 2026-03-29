@@ -136,10 +136,10 @@ export function Users() {
               <table className="w-full text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
                   <tr>
-                    <th className="px-6 py-3 font-medium">E-mail</th>
-                    <th className="px-6 py-3 font-medium">Nível</th>
-                    <th className="px-6 py-3 font-medium">Data de Criação</th>
-                    <th className="px-6 py-3 font-medium text-right">Ações</th>
+                    <th className="px-6 py-3 font-medium whitespace-nowrap">E-mail</th>
+                    <th className="px-6 py-3 font-medium whitespace-nowrap">Nível</th>
+                    <th className="px-6 py-3 font-medium whitespace-nowrap">Data de Criação</th>
+                    <th className="px-6 py-3 font-medium whitespace-nowrap text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">

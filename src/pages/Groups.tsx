@@ -76,11 +76,11 @@ export function Groups() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 text-sm font-semibold text-slate-600 whitespace-nowrap">ID</th>
-                <th className="p-4 text-sm font-semibold text-slate-600 whitespace-nowrap">Nome</th>
-                <th className="p-4 text-sm font-semibold text-slate-600 whitespace-nowrap">Admin (Email)</th>
-                <th className="p-4 text-sm font-semibold text-slate-600 whitespace-nowrap">Expiração</th>
-                <th className="p-4 text-sm font-semibold text-slate-600 whitespace-nowrap">Ações</th>
+                <th className="p-4 text-sm font-semibold text-slate-600">ID</th>
+                <th className="p-4 text-sm font-semibold text-slate-600">Nome</th>
+                <th className="p-4 text-sm font-semibold text-slate-600">Admin (Email)</th>
+                <th className="p-4 text-sm font-semibold text-slate-600">Expiração</th>
+                <th className="p-4 text-sm font-semibold text-slate-600 w-[1%] whitespace-nowrap">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -91,7 +91,7 @@ export function Groups() {
                     <Building className="w-4 h-4 text-slate-400" />
                     {group.name}
                   </td>
-                  <td className="p-4 text-sm text-slate-600">{group.admin_email || 'Sem admin'}</td>
+                  <td className="p-4 text-sm text-slate-600 break-all">{group.admin_email || 'Sem admin'}</td>
                   <td className="p-4 text-sm text-slate-600">
                     {editingId === group.id ? (
                       <input

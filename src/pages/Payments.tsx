@@ -61,11 +61,11 @@ export function Payments() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 font-medium text-slate-600 whitespace-nowrap">Usuário/Grupo</th>
-                <th className="p-4 font-medium text-slate-600 whitespace-nowrap">Pacote</th>
-                <th className="p-4 font-medium text-slate-600 whitespace-nowrap">Valor</th>
-                <th className="p-4 font-medium text-slate-600 whitespace-nowrap">Forma de Pagamento</th>
-                <th className="p-4 font-medium text-slate-600 whitespace-nowrap">Data e Hora</th>
+                <th className="p-4 font-medium text-slate-600">Usuário/Grupo</th>
+                <th className="p-4 font-medium text-slate-600">Pacote</th>
+                <th className="p-4 font-medium text-slate-600">Valor</th>
+                <th className="p-4 font-medium text-slate-600">Forma de Pagamento</th>
+                <th className="p-4 font-medium text-slate-600">Data e Hora</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

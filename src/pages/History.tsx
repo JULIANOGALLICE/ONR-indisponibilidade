@@ -105,15 +105,15 @@ export function History() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Data</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Documento Consultado</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Nome/Razão</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Usuário</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Qtd. Ordens</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Status</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Hash</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Protocolos</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 whitespace-nowrap text-center">Ações</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Data</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Documento Consultado</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Nome/Razão</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Usuário</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Qtd. Ordens</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Status</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Hash</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600">Protocolos</th>
+                  <th className="p-4 text-sm font-semibold text-gray-600 text-center w-[1%] whitespace-nowrap">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -131,7 +131,7 @@ export function History() {
                         {item.data || new Date(item.created_at.replace(' ', 'T')).toLocaleString('pt-BR')}
                       </div>
                     </td>
-                    <td className="p-4 text-sm font-medium text-gray-900">
+                    <td className="p-4 text-sm font-medium text-gray-900 break-all">
                       {item.documento}
                     </td>
                     <td className="p-4 text-sm text-gray-600">
@@ -139,8 +139,8 @@ export function History() {
                     </td>
                     <td className="p-4 text-sm text-gray-600">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-900">{item.user_name || item.user_email || '-'}</span>
-                        {item.user_email && item.user_name && <span className="text-xs text-indigo-600">{item.user_email}</span>}
+                        <span className="font-medium text-gray-900 break-all">{item.user_name || item.user_email || '-'}</span>
+                        {item.user_email && item.user_name && <span className="text-xs text-indigo-600 break-all">{item.user_email}</span>}
                         {(item.nome || item.documento_usuario) && (
                           <div className="mt-1 pt-1 border-t border-gray-100 flex flex-col">
                             <span className="text-xs text-gray-500">ONR: {item.nome}</span>
@@ -163,7 +163,7 @@ export function History() {
                         </span>
                       )}
                     </td>
-                    <td className="p-4 text-sm text-gray-600 font-mono text-xs">
+                    <td className="p-4 text-sm text-gray-600 font-mono text-xs break-all">
                       {item.hash || '-'}
                     </td>
                     <td className="p-4 text-sm text-gray-600">

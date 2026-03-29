@@ -119,7 +119,7 @@ export function Dashboard() {
     setLoading(false);
   };
 
-  const isExpired = user?.role !== 'superadmin' && expirationDate && new Date(expirationDate) < new Date();
+  const isExpired = user?.role !== 'superadmin' && expirationDate && new Date(expirationDate.replace(' ', 'T')) < new Date();
 
   return (
     <div className="space-y-6">

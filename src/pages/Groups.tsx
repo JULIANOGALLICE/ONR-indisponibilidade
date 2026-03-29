@@ -27,13 +27,13 @@ export function Groups() {
 
   const handleEdit = (group: any) => {
     setEditingId(group.id);
-    setEditDate(group.expiration_date ? new Date(group.expiration_date).toISOString().split('T')[0] : '');
+    setEditDate(group.expiration_date ? group.expiration_date.split('T')[0].split(' ')[0] : '');
   };
 
   const handleSave = async (id: number) => {
     try {
       await axios.put(`/api/groups/${id}/expiration`, {
-        expiration_date: editDate ? new Date(editDate).toISOString() : null
+        expiration_date: editDate ? new Date(editDate).toISOString().slice(0, 19).replace('T', ' ') : null
       });
       setEditingId(null);
       fetchGroups();
@@ -102,7 +102,7 @@ export function Groups() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-slate-400" />
-                      {group.expiration_date ? new Date(group.expiration_date).toLocaleDateString('pt-BR') : 'Ilimitado'}
+                      {group.expiration_date ? new Date(group.expiration_date.replace(' ', 'T')).toLocaleDateString('pt-BR') : 'Ilimitado'}
                     </div>
                   )}
                 </td>

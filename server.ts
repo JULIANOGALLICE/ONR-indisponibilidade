@@ -138,7 +138,7 @@ async function startServer() {
       if (trialDays > 0) {
         const date = new Date();
         date.setDate(date.getDate() + trialDays);
-        expirationDate = date.toISOString();
+        expirationDate = date.toISOString().slice(0, 19).replace('T', ' ');
       }
 
       await db.run('UPDATE users SET is_confirmed = 1, confirmation_token = NULL WHERE id = ?', [user.id]);
@@ -149,6 +149,39 @@ async function startServer() {
       res.json({ message: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
     } catch (err) {
       res.status(400).json({ error: 'Token inválido ou expirado.' });
+    }
+  });
+
+  app.post('/api/auth/resend-confirmation', async (req, res) => {
+    const { email } = req.body;
+    try {
+      const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+      if (!user) return res.status(400).json({ error: 'E-mail não encontrado.' });
+      if (user.is_confirmed) return res.status(400).json({ error: 'E-mail já confirmado.' });
+
+      const confirmationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
+      await db.run('UPDATE users SET confirmation_token = ? WHERE id = ?', [confirmationToken, user.id]);
+
+      let appUrl = req.headers.origin;
+      if (!appUrl || appUrl === 'null') {
+        appUrl = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.get('host')}`;
+      }
+      const confirmationLink = `${appUrl}/confirm-email?token=${confirmationToken}`;
+      
+      const emailHtml = `
+        <h2>Confirme seu cadastro</h2>
+        <p>Olá ${user.name},</p>
+        <p>Você solicitou o reenvio do link de confirmação. Por favor, clique no link abaixo para confirmar seu e-mail e ativar sua conta:</p>
+        <p><a href="${confirmationLink}">${confirmationLink}</a></p>
+        <p>Se você não solicitou este reenvio, ignore este e-mail.</p>
+      `;
+      
+      await sendEmail(db, email, 'Confirme seu cadastro', emailHtml);
+
+      res.json({ message: 'E-mail de confirmação reenviado com sucesso.' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro no servidor.' });
     }
   });
 
@@ -635,7 +668,7 @@ async function startServer() {
         let newExpiration = new Date();
         
         if (group && group.expiration_date) {
-          const currentExpiration = new Date(group.expiration_date);
+          const currentExpiration = new Date(group.expiration_date.replace(' ', 'T'));
           if (currentExpiration > newExpiration) {
             newExpiration = currentExpiration;
           }
@@ -645,10 +678,10 @@ async function startServer() {
         
         await db.run(
           'UPDATE `groups` SET expiration_date = ? WHERE id = ?',
-          [newExpiration.toISOString(), groupId]
+          [newExpiration.toISOString().slice(0, 19).replace('T', ' '), groupId]
         );
         
-        return res.json({ status: 'approved', expiration_date: newExpiration.toISOString() });
+        return res.json({ status: 'approved', expiration_date: newExpiration.toISOString().slice(0, 19).replace('T', ' ') });
       }
 
       // If already processed or not approved
@@ -704,7 +737,7 @@ async function startServer() {
           let newExpiration = new Date();
           
           if (group && group.expiration_date) {
-            const currentExpiration = new Date(group.expiration_date);
+            const currentExpiration = new Date(group.expiration_date.replace(' ', 'T'));
             if (currentExpiration > newExpiration) {
               newExpiration = currentExpiration;
             }
@@ -714,7 +747,7 @@ async function startServer() {
           
           await db.run(
             'UPDATE `groups` SET expiration_date = ? WHERE id = ?',
-            [newExpiration.toISOString(), groupId]
+            [newExpiration.toISOString().slice(0, 19).replace('T', ' '), groupId]
           );
         }
       } catch (err) {
@@ -792,7 +825,7 @@ async function startServer() {
       // Check expiration
       const group = await db.get('SELECT expiration_date FROM `groups` WHERE id = ?', [req.user.group_id]);
       if (req.user.role !== 'superadmin' && group && group.expiration_date) {
-        const expDate = new Date(group.expiration_date);
+        const expDate = new Date(group.expiration_date.replace(' ', 'T'));
         if (expDate < new Date()) {
           return res.status(403).json({ error: 'Sua licença expirou. Por favor, renove sua assinatura para continuar utilizando o sistema.' });
         }

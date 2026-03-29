@@ -39,7 +39,7 @@ export function Layout() {
 
   const calculateRemainingDays = () => {
     if (!expirationDate) return null;
-    const expDate = new Date(expirationDate);
+    const expDate = new Date(expirationDate.replace(' ', 'T'));
     const today = new Date();
     const diffTime = expDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

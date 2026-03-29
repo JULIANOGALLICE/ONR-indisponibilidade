@@ -50,7 +50,7 @@ export function History() {
       Documento: item.documento || '',
       Nome: item.nome_razao || item.nome || '',
       Hash: item.hash || '',
-      DataHora: item.data || new Date(item.created_at).toLocaleString('pt-BR'),
+      DataHora: item.data || new Date(item.created_at.replace(' ', 'T')).toLocaleString('pt-BR'),
       QtdOrdens: item.qtd_ordens || 0,
       Protocolos: protocolos.length > 0 ? protocolos.join(', ') : ''
     });
@@ -128,7 +128,7 @@ export function History() {
                     <td className="p-4 text-sm text-gray-600">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
-                        {item.data || new Date(item.created_at).toLocaleString('pt-BR')}
+                        {item.data || new Date(item.created_at.replace(' ', 'T')).toLocaleString('pt-BR')}
                       </div>
                     </td>
                     <td className="p-4 text-sm font-medium text-gray-900">

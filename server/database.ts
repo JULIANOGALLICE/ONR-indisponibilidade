@@ -58,10 +58,10 @@ export async function initDb() {
 
 export async function initMysql() {
   const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'usuario',
-    password: '@Cartorio18441@@',
-    database: 'bdIndisponibilidade',
+    host: process.env.MYSQL_HOST || 'localhost',
+    user: process.env.MYSQL_USER || 'usuario',
+    password: process.env.MYSQL_PASSWORD || '@Cartorio18441@@',
+    database: process.env.MYSQL_DATABASE || 'bdIndisponibilidade',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -174,7 +174,7 @@ export async function initMysql() {
 
   const settings = await db.get('SELECT * FROM system_settings LIMIT 1');
   if (!settings) {
-    await db.run('INSERT INTO system_settings (price_30, price_90, price_180, price_365) VALUES (0, 0, 0, 0)');
+    await db.run('INSERT INTO system_settings (price_30, price_90, price_180, price_365, trial_days) VALUES (0, 0, 0, 0, 7)');
   }
 
   return db;
@@ -372,7 +372,7 @@ export async function initSqlite() {
   // Insert default system settings if not exists
   const settings = await db.get('SELECT * FROM system_settings LIMIT 1');
   if (!settings) {
-    await db.run('INSERT INTO system_settings (price_30, price_90, price_180, price_365) VALUES (0, 0, 0, 0)');
+    await db.run('INSERT INTO system_settings (price_30, price_90, price_180, price_365, trial_days) VALUES (0, 0, 0, 0, 7)');
   }
 
   return db;

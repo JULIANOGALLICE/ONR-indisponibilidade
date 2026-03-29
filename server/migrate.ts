@@ -24,7 +24,14 @@ export async function migrateData(from: string, to: string) {
       const sql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
 
       for (const row of rows) {
-        const values = columns.map(col => row[col]);
+        const values = columns.map(col => {
+          let val = row[col];
+          // Fix datetime format for MySQL
+          if (to === 'mysql' && typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+            val = val.replace('T', ' ').replace('Z', '').split('.')[0];
+          }
+          return val;
+        });
         await (targetDb as any).run(sql, values);
       }
     }

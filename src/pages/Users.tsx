@@ -157,7 +157,7 @@ export function Users() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {new Date(u.created_at).toLocaleDateString('pt-BR')}
+                        {new Date(u.created_at.replace(' ', 'T')).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-6 py-4 text-right">
                         {u.role !== 'superadmin' && u.id !== user?.id && (

@@ -30,7 +30,7 @@ export function Payments() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('pt-BR');
+    return new Date(dateString.replace(' ', 'T')).toLocaleString('pt-BR');
   };
 
   const getPaymentMethodName = (method: string) => {
